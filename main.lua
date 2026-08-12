@@ -153,6 +153,41 @@ local function sceneSize(ctx)
   return ctx.width, ctx.height
 end
 
+-- ------- Gen 2 load helpers
+--
+-- Gold boots the same mod API, but the live world is Game2.world (exposed as
+-- Game.overworld by Gen2Compat), the options UI does not call Pipelines.rows,
+-- and several Gen 1 modules the feature pack touches are unserved.  These
+-- helpers keep the VOXEL pipeline from being marked broken on the first
+-- thrown error in an optional feature.
+
+local function isGen2()
+  local ok, GV = pcall(require, "src.core.GameVersion")
+  if ok and GV then
+    if GV.isGold and GV.isGold() then return true end
+    if GV.generation and GV.generation() == 2 then return true end
+    if GV.get and GV.get() == "gold" then return true end
+    if GV.current == "gold" then return true end
+  end
+  return false
+end
+
+-- Live overworld / world, Gen 1 or Gen 2 (Gen2Compat maps .overworld -> .world)
+local function liveWorld()
+  local ok, Game = pcall(require, "src.core.Game")
+  if not ok or not Game then return nil end
+  return Game.overworld or Game.world
+end
+
+local function safeCall(label, fn, ...)
+  if type(fn) ~= "function" then return end
+  local ok, err = pcall(fn, ...)
+  if not ok then
+    print(("[DRAMATIC_SHAPE] %s failed: %s"):format(label, tostring(err)))
+  end
+  return ok
+end
+
 local voidFill = { last = nil }
 function voidFill.check()
   local TileRenderer = require("src.render.TileRenderer")
@@ -195,21 +230,21 @@ mod.content.render_pipelines:register("voxel", {
     -- frame: it SETS the other rows and then leaves them alone. Holding them
     -- would make the zoom keys and the wheel dead while the mode was on, and
     -- would fight anyone who changed one deliberately.
-    applyFull(level)
-    Voxel.update(dt, level)
+    safeCall("applyFull", applyFull, level)
+    safeCall("Voxel.update", Voxel.update, dt, level)
     -- the first-person head, on the same tick: its blend in and out of the
     -- orbit, the mouse capture lifecycle, and the frame's stick-rate look.
     -- Unconditional like Voxel.update, because the blend has to keep easing
     -- OUT after the rung is left
-    FirstPerson.update(dt)
+    safeCall("FirstPerson.update", FirstPerson.update, dt)
     -- the day/night clock, on the same always-running tick: Pipelines.update
     -- runs whatever the level, so time passes with the mode off, through
     -- battles and menus, and a CYCLE evening falls mid-fight exactly as it
     -- would mid-walk
-    DayNight.update(dt)
+    safeCall("DayNight.update", DayNight.update, dt)
     -- the atmosphere's own clock (shaft shimmer, drifting motes), on the
     -- same tick so the beams keep breathing through a dialog box
-    ForestAtmos.update(dt)
+    safeCall("ForestAtmos.update", ForestAtmos.update, dt)
     -- LET'S GO rides the same always-running tick, and BEFORE the battle's
     -- own update on purpose: the capture session poses the Poke Ball here,
     -- and OverworldBattle.update renders the arena a moment later -- so
@@ -250,7 +285,7 @@ mod.content.render_pipelines:register("voxel", {
     -- it has to keep thinking while a warp's wipe covers the screen (the
     -- crowd follows the player through the door) and under the GAME OVER
     -- card, which is a pushed state that stops everything below it.
-    Horde.update(dt)
+    safeCall("Horde.update", Horde.update, dt)
     -- VOID FILL picks the block the border ring is made of, and in this
     -- mode that ring is BAKED INTO THE MESH rather than drawn each frame.
     -- So the option has to reach the cache or nothing happens on screen
@@ -260,25 +295,32 @@ mod.content.render_pipelines:register("voxel", {
     -- row, applyOptions on load, TileRenderer.setVoidFill) and none of
     -- them announces it. Ahead of the active() gate, so switching it
     -- while voxel mode is OFF still invalidates what is cached.
-    voidFill.check()
+    -- TileRenderer / voidFill are Gen 1 concepts; skip the poll on Gen 2.
+    if not isGen2() then safeCall("voidFill.check", voidFill.check) end
     -- The whole VR frame -- session lifecycle, xrWaitFrame's pacing, both
     -- eye renders, the layer submit -- rides this hook, because it is the
     -- one tick that runs through menus, dialogs and battles, which is
     -- what a headset needs the world (or at least the UI panel) to do.
     -- Ahead of the active() gate: with the mode off, the headset still
     -- shows the flat screen on the floating panel.
-    VR.update(dt)
+    safeCall("VR.update", VR.update, dt)
     if not Voxel.active() then return end
-    local Game = require("src.core.Game")
-    local ow = Game and Game.overworld
+    local ow = liveWorld()
     if ow and ow.map and ow.camera then
       pcall(VoxelScene.prefetch, ow)
     end
-    ChunkMesher.pump(Game and Game.stack
-                     and Game.stack:top() ~= ow)
+    local okG, Game = pcall(require, "src.core.Game")
+    local top = okG and Game and Game.stack and Game.stack:top() or nil
+    safeCall("ChunkMesher.pump", ChunkMesher.pump, top ~= nil and top ~= ow)
   end,
 
   drawWorld = function(ctx)
+    -- Never throw out of drawWorld: Pipelines.guardRender marks the pipeline
+    -- broken for the whole session on the first error, which reads as
+    -- "VOXEL does nothing".  Gen 2's World state shape is close but not
+    -- identical to Gen 1's overworld; soft-fail back to 2D until the scene
+    -- path is fully adapted.
+    local ok, result = pcall(function()
     -- the palette closure, stashed for the VR frame: it renders from the
     -- update hook, where no ctx exists to carry one
     VR.paletteFor = ctx.paletteFor
@@ -327,6 +369,32 @@ mod.content.render_pipelines:register("voxel", {
     -- and back to the window's own size, which is what the engine composites
     -- one canvas pixel to one display pixel.  A pass-through when AA is off.
     return AntiAlias.resolve(canvas, sw, sh, "world")
+    end)
+    if not ok then
+      if not V.drawWorldWarned then
+        V.drawWorldWarned = true
+        print(("[DRAMATIC_SHAPE] drawWorld 3D failed (Gen2 2D canvas fallback): %s"):format(tostring(result)))
+      end
+      -- Gen 2: worldPresent (T-SHIFT) only runs when drawWorld returns a
+      -- canvas. Capture the engine's own 2D world so T-SHIFT and the VOXEL
+      -- ownership of the pass still work while 3D is not ready.
+      if isGen2() and ctx and ctx.state and type(ctx.state.drawWorldBody) == "function" then
+        local ok2, canvas = pcall(function()
+          local G = love.graphics
+          local w = ctx.width or G.getWidth()
+          local h = ctx.height or G.getHeight()
+          local c = G.newCanvas(w, h)
+          G.setCanvas(c)
+          G.clear(0, 0, 0, 1)
+          ctx.state:drawWorldBody(ctx.scale or 1)
+          G.setCanvas()
+          return c
+        end)
+        if ok2 and canvas then return canvas end
+      end
+      return nil
+    end
+    return result
   end,
 
   invalidate = function()
@@ -389,50 +457,35 @@ applyFull = function(level)
   fullWas = isFull
   if not isFull or was == true or was == nil then return end
 
-  local Game = require("src.core.Game")
+  local okG, Game = pcall(require, "src.core.Game")
+  if not okG or not Game then return end
   local Pipelines = require("src.render.Pipelines")
-  local Zoom = require("src.render.Zoom")
-  local opts = Game.save and Game.save.options
+  local opts = (Game.save and Game.save.options) or Game.options
   if not opts then return end
 
-  -- the miniature blur at its strongest: FULL is the diorama look, and the
-  -- tilt-shift is most of what makes it read as a model
+  -- T-SHIFT at full strength is the one part of FULL that is generation-
+  -- agnostic: worldPresent only needs a world canvas. Do this first so a
+  -- later Gen1-only setting failure cannot skip it.
   Pipelines.setLevel("tiltshift", Pipelines.maxLevel("tiltshift"))
   Pipelines.syncOptions(opts)
-  -- the horizon flat. The curve bends the world away from a walking player,
-  -- which fights a fixed diorama framing
-  WorldCurve.setting:setIndex(1, Game)
-  -- and the world cut to the window it is framed in (lib/ViewBox). FULL is
-  -- the model-on-a-table read and the sides are most of what makes it one:
-  -- a slab of Kanto with edges, rather than a map whose corners happen to
-  -- fall off the frame.
-  ViewBox.setting:setIndex(1, Game)
-  -- and the water reflecting everything it can: FULL is the diorama at its
-  -- most photographed, and a lake with the sky and the shoreline in it is
-  -- most of what makes the model read as being outdoors
-  Water.setting:setIndex(1, Game)
-  -- and the view fitted to the window
+
+  -- The rest of the preset touches Gen 1 settings / modules. On Gen 2 skip
+  -- them so FULL does not throw mid-way and leave options half-applied.
+  if isGen2() then
+    if Game.writeOptions then pcall(Game.writeOptions, Game) end
+    return
+  end
+
+  local Zoom = require("src.render.Zoom")
+  pcall(function() WorldCurve.setting:setIndex(1, Game) end)
+  pcall(function() ViewBox.setting:setIndex(1, Game) end)
+  pcall(function() Water.setting:setIndex(1, Game) end)
   opts.zoom = 0
-  Zoom.applyOptions(opts)
-  -- battles on the map too: FULL means the whole mode, and a fight is where
-  -- half of it is spent. Set and then LET GO of -- unlike the rows above, both
-  -- battle rows stay on the menu under FULL (see the rows hook), so this is
-  -- where the preset puts them and not where they are held.
-  OverworldBattle.setting:setIndex(1, Game)
-  -- with both mons out there on it: BACK SPRITES keeps the player's own on the
-  -- menu, which is the one part of the old screen FULL is least about. Set the
-  -- same way, and changed back on the same row a keypress later.
-  OverworldBattle.backSetting:setIndex(1, Game)
-  -- and the battle screen the staged fight is composed for. WIDE re-lays that
-  -- screen out on a 304x144 surface, which moves every anchor the arena camera
-  -- is solved against (OverworldBattle.forceOG); FULL has just switched staged
-  -- fights on, so the layout follows them.
-  OverworldBattle.forceOG(Game)
-  -- and the sky on the clock on the wall: FULL pins DAYTIME to SYNC. Unlike
-  -- the rest of the preset this one IS held, not just set -- the row is off
-  -- the menu while FULL owns it (the rows hook below), so a value changed
-  -- under it could never be seen or changed back.
-  DayNight.forceSync(Game)
+  pcall(Zoom.applyOptions, opts)
+  pcall(function() OverworldBattle.setting:setIndex(1, Game) end)
+  pcall(function() OverworldBattle.backSetting:setIndex(1, Game) end)
+  pcall(OverworldBattle.forceOG, Game)
+  pcall(DayNight.forceSync, Game)
   if Game.writeOptions then pcall(Game.writeOptions, Game) end
 end
 
@@ -590,7 +643,7 @@ local SETTINGS = {
     full = true },
 }
 
-SettingsMenu.define(SETTINGS)
+safeCall("SettingsMenu.define", SettingsMenu.define, SETTINGS)
 
 local schema = {}
 for _, entry in ipairs(SETTINGS) do
@@ -846,10 +899,9 @@ end
 -- GBC FX: a row that no longer decides anything is worse than no row.
 -- Uninstall the mod and it is back, at whatever it was last set to.
 local function pinEngineFx(game)
-  game = game or require("src.core.Game")
-  local opts = game and game.save and game.save.options
-  local Tilt = require("src.render.Tilt")
-  local GBCFX = require("src.render.GBCFX")
+  local okG, G = pcall(require, "src.core.Game")
+  game = game or (okG and G) or nil
+  local opts = game and ((game.save and game.save.options) or game.options) or nil
   local changed = false
   if opts then
     changed = (opts.tilt or 0) ~= 0 or (opts.gbcfx or 0) ~= 0
@@ -857,9 +909,9 @@ local function pinEngineFx(game)
     opts.tilt, opts.gbcfx = 0, 0
     opts.battleBg = "white"
   end
-  pcall(Tilt.setLevel, 0)
-  pcall(GBCFX.setLevel, 0)
-  if changed and game.writeOptions then pcall(game.writeOptions, game) end
+  pcall(function() require("src.render.Tilt").setLevel(0) end)
+  pcall(function() require("src.render.GBCFX").setLevel(0) end)
+  if changed and game and game.writeOptions then pcall(game.writeOptions, game) end
 end
 
 -- ------- the values that follow other values
@@ -886,7 +938,39 @@ SettingsMenu.setOnChanged(pinDependents)
 mod.hooks:wrap("ui.options.rows", function(next, game, rows)
   local out = next(game, rows)
   if type(out) ~= "table" then return out end
-  local Pipelines = require("src.render.Pipelines")
+
+  local okP, Pipelines = pcall(require, "src.render.Pipelines")
+  if not okP then Pipelines = nil end
+
+  -- Gen 2 first: inject pipeline rows before any Gen1 pin logic that might
+  -- throw. Gen 2 OptionsMenu never calls Pipelines.rows on its own.
+  if isGen2() then
+    if Pipelines and Pipelines.rows then
+      local have = {}
+      for _, row in ipairs(out) do
+        if type(row) == "table" and row.id then have[row.id] = true end
+      end
+      local okRows, pipeRows = pcall(Pipelines.rows, game)
+      if okRows and type(pipeRows) == "table" then
+        for _, row in ipairs(pipeRows) do
+          if type(row) == "table" and row.id and not have[row.id] then
+            out[#out + 1] = row
+            have[row.id] = true
+          end
+        end
+      end
+    end
+    -- still drop engine TILT/GBCFX if present; soft so a miss cannot hide VOXEL
+    pcall(function()
+      dropRow(out, "tilt")
+      dropRow(out, "gbcfx")
+      dropRow(out, "battleBg")
+    end)
+    return out
+  end
+
+  -- ------- Gen 1 path below
+  if not Pipelines then return out end
   -- ahead of every branch below, including FULL's early return: these two are
   -- off the menu whatever else this mod is or is not doing
   pinEngineFx(game)
@@ -915,6 +999,7 @@ mod.hooks:wrap("ui.options.rows", function(next, game, rows)
     -- and each of them by the same `full` rule rather than by name.
     DayNight.forceSync(game)
   end
+
   -- The two pipeline rows move INTO the mod's own root menu: captured as the
   -- engine built them, then dropped from here so they are not in two places.
   local captured, voxelRow = {}, nil
@@ -1167,7 +1252,7 @@ end
 -- BattleState:drawHUDs -- all live in lib/OverworldBattle.lua, which is
 -- where the reasoning for each one is written down. Installed once, here,
 -- so this file keeps naming every engine seam the mod touches.
-OverworldBattle.install()
+safeCall("OverworldBattle.install()", function() OverworldBattle.install() end)
 
 -- ------- shiny Pokemon
 --
@@ -1200,10 +1285,10 @@ OverworldBattle.install()
 -- The Stadium models need no seam here at all: their recolour happens at
 -- extraction (lib/StadiumBuild.lua), and the battle simply asks for the
 -- shiny pack.
-ShinyBattle.install()
-ShinyUI.install()
-ShinyPics.install()
-ShinyFlash.install()
+safeCall("ShinyBattle.install()", function() ShinyBattle.install() end)
+safeCall("ShinyUI.install()", function() ShinyUI.install() end)
+safeCall("ShinyPics.install()", function() ShinyPics.install() end)
+safeCall("ShinyFlash.install()", function() ShinyFlash.install() end)
 
 -- ShinyPics needs to know WHICH Pokemon a pic is being built for, and the
 -- two palette functions it wraps are told only the species. The individual
@@ -1248,8 +1333,8 @@ mod.events:on("save.created", function() ShinyBattle.markParty() end)
 -- per-cell consequence still runs through the engine's own machinery
 -- (onStepComplete, checkEdgeExit, checkLedgeHop, checkBoulderPush). The
 -- file argues the whole arrangement.
-FirstPerson.install()
-FreeMove.install()
+safeCall("FirstPerson.install()", function() FirstPerson.install() end)
+safeCall("FreeMove.install()", function() FreeMove.install() end)
 
 -- ------- the zooms, and the battle camera the player can steer
 --
@@ -1260,7 +1345,7 @@ FreeMove.install()
 -- wrap installed later is the OUTER one, so a fight gets first refusal on
 -- the mouse and the fingers, which is right, because while one is staged
 -- the free-roam look is not driving.
-CamControl.install()
+safeCall("CamControl.install()", function() CamControl.install() end)
 
 -- ------- SELECT walks the angle ladder
 --
@@ -1301,7 +1386,7 @@ end
 -- handleInput at all -- it reads the fixed step's own press queue, which
 -- is where keyboard, pad, touch and the VR controllers have all already
 -- become the same eight buttons. See lib/Horde.lua.
-Horde.install()
+safeCall("Horde.install()", function() Horde.install() end)
 
 -- ------- LET'S GO capture mode
 --
@@ -1310,7 +1395,7 @@ Horde.install()
 -- read before anything else can claim the pointer -- and outside the aim
 -- they forward every byte untouched. The battle-side wraps (throwBall,
 -- safariAction) and the experience hooks install here too.
-LetsGo.install()
+safeCall("LetsGo.install()", function() LetsGo.install() end)
 
 -- ------- edge-anchored menus stay in the GB frame while a headset is live
 --

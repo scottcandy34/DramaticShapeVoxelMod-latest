@@ -17,7 +17,7 @@
     "engine_internals"
   ],
   "affects_link": false,
-  "description": "Draws the overworld as a 3D diorama. Supports Generation 1 and Generation 2 (Gold) on gen1recomp.",
+  "description": "Draws the overworld as a 3D diorama. Supports Generation 1 (Red/Blue/Yellow) and Generation 2 (Gold) on gen1recomp.",
   "github": "scottcandy34/DramaticShapeVoxelMod-latest",
   "games": [
     "gen1",

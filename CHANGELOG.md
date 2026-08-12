@@ -1,12 +1,26 @@
 # Changelog
 
-## 1.9.0
-- Declared Gen 2 support in the manifest (`games: [gen1, gen2]`, `gen2compat: true`) so the mod loads when Pokémon Gold is selected on gen1recomp.
-- No code changes. This isolates whether the missing VOXEL option on Gold is a load/skip issue vs a runtime error.
+## 1.9.0 — Gen 2 (Gold) load support
 
-## Unreleased
+Per [Preparing Your Mod for Gen 2](https://github.com/bryanthaboi/gen1recomp/wiki/Guide-Preparing-Your-Mod-For-Gen-2):
 
-## Unreleased
+### Manifest
+- `"games": ["gen1", "gen2"]` so the loader runs the mod on Gold (avoids MK400 skip).
+- `"gen2compat": true` kept as additive legacy flag.
+
+### Gen 2 engine seams this mod accounts for
+- **OPTIONS rows:** Gen 2 `OptionsMenu` never calls `Pipelines.rows`. The mod injects pipeline rows via `ui.options.rows` so VOXEL / T-SHIFT appear.
+- **Pipeline hard-fail:** a single throw in `update`/`drawWorld` marks the pipeline broken for the session. Optional feature ticks and `install()` calls are soft-failed; `drawWorld` is pcall'd.
+- **Live world:** use `Game.overworld` (Gen2Compat maps to `Game2.world`); helper `liveWorld()`.
+- **FULL preset:** on Gen 2 only sets T-SHIFT; skips Gen1-only ViewBox / WorldCurve / battle settings.
+- **T-SHIFT while VOXEL is on:** `worldPresent` only runs when `drawWorld` returns a canvas. On Gen 2, if 3D fails, the engine 2D world is captured to a canvas so T-SHIFT can still apply.
+
+### Known (not load blockers)
+- Real 3D voxels still need a Gen 2 height path: Gold `Map:cellTile` returns COLL_* bytes, not Gen 1 tile ids. Geometry work is separate from load.
+
+`modkit gen2check` verdict: **will load** on Gen 2.
+
+## 1.8.2
 
 ### Added
 
