@@ -1,7 +1,7 @@
 {
   "id": "DRAMATIC_SHAPE",
   "name": "Dramatic Shape Voxel Mod",
-  "version": "1.8.2",
+  "version": "1.9.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -17,6 +17,11 @@
     "engine_internals"
   ],
   "affects_link": false,
-  "description": "Draws the overworld as a 3D diorama.",
-  "github": "DramaticShape/DramaticShapeVoxelMod"
+  "description": "Draws the overworld as a 3D diorama. Supports Generation 1 and Generation 2 (Gold) on gen1recomp.",
+  "github": "scottcandy34/DramaticShapeVoxelMod-latest",
+  "games": [
+    "gen1",
+    "gen2"
+  ],
+  "gen2compat": true
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0
+- Declared Gen 2 support in the manifest (`games: [gen1, gen2]`, `gen2compat: true`) so the mod loads when Pokémon Gold is selected on gen1recomp.
+- No code changes. This isolates whether the missing VOXEL option on Gold is a load/skip issue vs a runtime error.
+
+## Unreleased
+
 ## Unreleased
 
 ### Added
