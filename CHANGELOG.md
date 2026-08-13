@@ -15,10 +15,18 @@ Per [Preparing Your Mod for Gen 2](https://github.com/bryanthaboi/gen1recomp/wik
 - **FULL preset:** on Gen 2 only sets T-SHIFT; skips Gen1-only ViewBox / WorldCurve / battle settings.
 - **T-SHIFT while VOXEL is on:** `worldPresent` only runs when `drawWorld` returns a canvas. On Gen 2, if 3D fails, the engine 2D world is captured to a canvas so T-SHIFT can still apply.
 
-### Known (not load blockers)
-- Real 3D voxels still need a Gen 2 height path: Gold `Map:cellTile` returns COLL_* bytes, not Gen 1 tile ids. Geometry work is separate from load.
+### Load
+- Manifest: `games: [gen1, gen2]`, `gen2compat: true`
+- OPTIONS: inject `Pipelines.rows` on Gen 2 (engine menu does not call them)
+- Soft-fail pipeline update/drawWorld/install so unserved Gen1 APIs cannot break the session
 
-`modkit gen2check` verdict: **will load** on Gen 2.
+### Voxel geometry (from gen2 dramatic shapes reference, adapted for original gen1recomp)
+- `data/voxel_heights.lua`: Gen 2 `collision` class → shape table; `TilesetJohto` outdoor pins
+- `lib/TileShape.lua`: when `tileset.collision` is set, resolve shapes via COLL_* classes (`shapes.coll`)
+- `lib/VoxelScene.lua`: `groundAt` uses `TileShape.at` (not raw `shapes[cellTile]`) so Gen 2 COLL_* works
+- `lib/TerrainAtlas.lua`: `renderer.trueColor` + `gen2Pixels` for Gold palMap/palColors atlases
+
+Gen 1 pins and behavior are unchanged.
 
 ## 1.8.2
 

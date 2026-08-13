@@ -76,17 +76,171 @@ end
 -- The static atlas for `map` under `colors`: the answer this file gave
 -- before animation existed, and the base every animated frame is patched
 -- over. Returns the image and, when we baked it ourselves, its pixels.
+-- Gen 2 colored tileset atlas: same path as World:bakeMapImage -- grayscale
+-- sheet drawn through GbcPalette.with per tilePalettes slot.
+local function gen2ColoredAtlas(map)
+  local tileset = map and map.tileset
+  if not (tileset and tileset.image) then
+    if V and V.dlog then V.dlog("colorBake: no tileset.image") end
+    return nil
+  end
+  local okP, Palettes = pcall(require, "src.world.gen2.Palettes")
+  if not okP then
+    if V and V.dlog then V.dlog("colorBake: require Palettes failed") end
+    return nil
+  end
+
+  -- Resolve the live Gen 2 World (Game.overworld is Gen1-shaped; Gold uses
+  -- the stack top).
+  local world, game = nil, nil
+  do
+    local ok, Game = pcall(require, "src.core.Game")
+    if ok and Game then
+      game = Game
+      world = Game.overworld or Game.world
+      if not world and Game.stack and Game.stack.top then
+        local top = Game.stack:top()
+        if top and top.map then world = top end
+      end
+    end
+  end
+
+  local daytime = (world and world.daytime) or "DAY"
+
+  -- Palette table: World.palettes, Game.data.gen2Palettes, or load the file.
+  local palData = world and world.palettes
+  if not palData and world and world.game and world.game.data then
+    palData = world.game.data.gen2Palettes
+  end
+  if not palData and game and game.data then
+    palData = game.data.gen2Palettes
+  end
+  if not palData then
+    local ok, value = pcall(function()
+      local chunk, err = love.filesystem.load("data/generated/palettes.lua")
+      if not chunk then error(err or "load failed") end
+      return chunk()
+    end)
+    if ok then
+      palData = value
+      if V and V.dlog then V.dlog("colorBake: loaded palettes.lua directly") end
+    else
+      if V and V.dlog then
+        V.dlog("colorBake: no palettes data (" .. tostring(value) .. ")")
+      end
+      return nil
+    end
+  end
+
+  local def = map.def
+  if not def then
+    if V and V.dlog then V.dlog("colorBake: no map.def") end
+    return nil
+  end
+  local bgSet = Palettes.bgSet(palData, def, daytime)
+  if not bgSet then
+    if V and V.dlog then
+      V.dlog(("colorBake: bgSet nil env=%s daytime=%s hasBg=%s"):format(
+        tostring(def.environment), tostring(daytime),
+        tostring(palData.bg ~= nil)))
+    end
+    return nil
+  end
+
+  local ok, image = pcall(function()
+    local src = Assets.imageData(tileset.image)
+    local iw, ih = src:getDimensions()
+    local tilesPerRow = tileset.tilesPerRow or 16
+    local tilePalettes = tileset.tilePalettes
+    local dst = love.image.newImageData(iw, ih)
+    local tileCount = math.floor(iw / 8) * math.floor(ih / 8)
+
+    for t = 0, tileCount - 1 do
+      local slot = tilePalettes and tilePalettes[t + 1] or 1
+      local colors = bgSet[slot] or bgSet[1]
+      local ox = (t % tilesPerRow) * 8
+      local oy = math.floor(t / tilesPerRow) * 8
+      for py = 0, 7 do
+        for px = 0, 7 do
+          local r, g, b, a = src:getPixel(ox + px, oy + py)
+          local shade = math.floor((1.0 - r) * 3.0 + 0.5)
+          if shade < 0 then shade = 0 elseif shade > 3 then shade = 3 end
+          local c = colors and colors[shade + 1]
+          if c then
+            dst:setPixel(ox + px, oy + py,
+              (c[1] or 0) / 255, (c[2] or 0) / 255, (c[3] or 0) / 255, a)
+          else
+            dst:setPixel(ox + px, oy + py, r, g, b, a)
+          end
+        end
+      end
+    end
+    local img = love.graphics.newImage(dst)
+    img:setFilter("nearest", "nearest")
+    return img
+  end)
+  if not ok then
+    if V and V.dlog then V.dlog("colorBake: bake error " .. tostring(image)) end
+    return nil
+  end
+  return image
+end
+
+local function gen2Pixels(map)
+  return nil  -- ImageData path unused; gen2ColoredAtlas returns a canvas/Image
+end
+
 local function staticAtlas(map, colors)
   local renderer = map.renderer
   local base = renderer and renderer.image
-  if not base then return nil end
-  -- already true color: RED++'s baked per-map atlas, or a mod's own art
-  if not colors or renderer.gbcAtlas or map.tileset.trueColor then
+  local tileset = map.tileset
+
+  -- Gen 2 World maps often have no TileRenderer attached (no renderer.image).
+  -- Fall back to the tileset art, optionally baking palMap/palColors.
+  if not base then
+    -- Key includes daytime so dawn/day/night rolls over correctly.
+    local daytime = "DAY"
+    pcall(function()
+      local Game = require("src.core.Game")
+      local w = Game.overworld or Game.world
+      if w and w.daytime then daytime = w.daytime end
+    end)
+    local key = "gen2fallback:" .. tostring(tileset and tileset.image) .. "#" .. daytime
+    if cache[key] ~= nil then return cache[key] or nil, cacheData[key] end
+    local colored = gen2ColoredAtlas(map)
+    if colored then
+      if V and V.dlog and not TerrainAtlas._colorLogged then
+        TerrainAtlas._colorLogged = true
+        V.dlog("terrain atlas: GBC color bake ok for " .. tostring(tileset and tileset.image))
+      end
+      cache[key] = colored
+      cacheData[key] = false
+      return colored, false
+    end
+    if V and V.dlog and not TerrainAtlas._grayLogged then
+      TerrainAtlas._grayLogged = true
+      V.dlog("terrain atlas: color bake missed, using grayscale for " .. tostring(tileset and tileset.image))
+    end
+    -- last resort: raw grayscale sheet
+    local ok, img = pcall(Assets.image, tileset and tileset.image)
+    if ok and img then
+      img:setFilter("nearest", "nearest")
+      cache[key] = img
+      return img, false
+    end
+    cache[key] = false
+    return nil
+  end
+
+  -- already true color: RED++'s baked per-map atlas, a mod's own art, or
+  -- Gen 2's per-tile palMap/palColors bake (renderer.trueColor).
+  if not colors or renderer.gbcAtlas or renderer.trueColor
+     or (tileset and tileset.trueColor) then
     return base, false
   end
   if not (love.image and love.image.newImageData) then return base, false end
 
-  local path = map.tileset.image
+  local path = tileset.image
   local key = path .. "#" .. paletteKey(colors)
   if cache[key] ~= nil then return cache[key] or base, cacheData[key] end
 
@@ -377,6 +531,9 @@ end
 -- so the art on disk IS what it was built from. RED++'s per-map bake exists
 -- only on the GPU -- getGbcAtlas throws its ImageData away once the texture
 -- is made -- so that one has to come back off the texture (readback below).
+-- Gen 2 tilesets: bake atlas from palMap/palColors when the engine has not
+-- already left a trueColor texture in renderer.image (see staticAtlas).
+
 local function rendererPixels(map)
   local renderer = map.renderer
   if not renderer then return nil end
@@ -386,6 +543,10 @@ local function rendererPixels(map)
   end
   if renderer.gbcAtlas then
     return gbcPixels(map) or readback(renderer.image)
+  end
+  -- Gen 2 trueColor path without tileset.trueColor flag
+  if renderer.trueColor and not (map.tileset and map.tileset.trueColor) then
+    return gen2Pixels(map) or readback(renderer.image)
   end
   local ok, data = pcall(Assets.imageData, map.tileset.image)
   return ok and data or nil

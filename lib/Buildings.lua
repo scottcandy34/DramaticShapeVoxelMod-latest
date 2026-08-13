@@ -1687,15 +1687,45 @@ end
 -- model per template, and stamp it. Returns nothing; the quads land in
 -- S.objectQuads and the tiles are claimed so the volume path never boxes a
 -- building this module has already modelled.
+-- Gold extractor ids look like TILESET_JOHTO; profile keys are TilesetJohto.
+local function profileTilesetId(id)
+  if not id then return id end
+  local s = profile()
+  if s and s.buildings and s.buildings[id] then return id end
+  if s and s.tilesets and s.tilesets[id] then return id end
+  if type(id) == "string" and id:match("^TILESET_") then
+    local parts = {}
+    for part in id:sub(9):gmatch("[^_]+") do
+      parts[#parts + 1] = part:sub(1, 1) .. part:sub(2):lower()
+    end
+    local camel = "Tileset" .. table.concat(parts)
+    if s and ((s.buildings and s.buildings[camel])
+              or (s.tilesets and s.tilesets[camel])) then
+      return camel
+    end
+  end
+  return id
+end
+
 function Buildings.build(S, map, data, perRow)
   if not data then return end
   local tileset = map.tileset
   local s = profile()
-  local list = s and s.buildings and s.buildings[tileset.id]
+  local pid = profileTilesetId(tileset.id)
+  local list = s and s.buildings and s.buildings[pid]
   if not list then return end
 
-  local atlasW = tileset.imageWidth or 128
-  local atlasH = tileset.imageHeight or 48
+  local atlasW = tileset.imageWidth
+  local atlasH = tileset.imageHeight
+  if not (atlasW and atlasH) and tileset.image then
+    pcall(function()
+      local Assets = require("src.render.Assets")
+      local img = Assets.imageData(tileset.image)
+      atlasW, atlasH = img:getDimensions()
+    end)
+  end
+  atlasW = atlasW or 128
+  atlasH = atlasH or 48
   local tw, th = map.def.width * 4, map.def.height * 4
   local quads = S.objectQuads
 

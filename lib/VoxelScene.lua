@@ -181,13 +181,15 @@ local function groundAt(map, cellX, cellY)
   -- exactly one step -- the "hops like a ledge" seam bug.
   if not map:inBounds(cellX, cellY) then return 0 end
   local shapes = TileShape.forMap(map)
-  local s = shapes[map:cellTile(cellX, cellY)]
+  -- Gen 2: cellTile is COLL_*, not a tile id. Resolve via TileShape.at so
+  -- shapes.coll and cell walkability rules apply (same as the mesher path).
+  local tx, ty = cellX * 2, cellY * 2 + 1
+  local tile = map.tileAt and map:tileAt(tx, ty) or map:cellTile(cellX, cellY)
+  local s = TileShape.at(map, shapes, tile, tx, ty)
   if not s then return 0 end
-  -- a recessed class (water) still supports whatever stands on it; only
-  -- raised ground lifts the model.  Stairs never do: the class height is
-  -- the flight's TALL end, but the player enters at floor level and the
-  -- warp fires as they step in -- lifting them onto the geometry read as
-  -- climbing an invisible block
+  if s.art == "upright" and map.isWalkableCell and map:isWalkableCell(cellX, cellY) then
+    return 0
+  end
   if s.art == "stair" then return 0 end
   return s.h > 0 and s.h or 0
 end
@@ -421,6 +423,14 @@ end
 -- actually changes (a map crossing), not every frame.
 local lastLiveKey = nil
 
+-- Gen 1 neighbours carry `nb.map` (full Map). Gen 2 World:rebuildNeighbors
+-- only stores { id, ox, oy, image } for the 2D blit path. Skip entries
+-- without a Map so the current map can still mesh; connected maps stay
+-- flat until a Map is attached.
+local function nbMap(nb)
+  return nb and nb.map or nil
+end
+
 -- Request everything `state`'s frame wants and evict what it no longer
 -- does; returns the current map's terrain mesh (or nil while it builds)
 -- and the neighbour meshes ready to draw. render() calls this for the
@@ -439,11 +449,15 @@ function VoxelScene.prefetch(state)
   -- is evicted -- meshes released, analysis dropped -- so memory stays
   -- bounded by the neighbourhood instead of growing with every area
   -- ever visited.
+  if not (state and state.map and state.map.id) then return nil end
   local liveKey = state.map.id
   local live = { [state.map.id] = true }
   for _, nb in ipairs(state.neighbors or {}) do
-    live[nb.map.id] = true
-    liveKey = liveKey .. "|" .. nb.map.id
+    local m = nbMap(nb)
+    if m and m.id then
+      live[m.id] = true
+      liveKey = liveKey .. "|" .. m.id
+    end
   end
   if liveKey ~= lastLiveKey then
     lastLiveKey = liveKey
@@ -457,9 +471,12 @@ function VoxelScene.prefetch(state)
   -- suppressed under them (see runGeometry)
   local masks = {}
   for _, nb in ipairs(state.neighbors or {}) do
-    masks[#masks + 1] = { nb.ox, nb.oy,
-                          nb.ox + nb.map.def.width * 32,
-                          nb.oy + nb.map.def.height * 32 }
+    local m = nbMap(nb)
+    if m and m.def then
+      masks[#masks + 1] = { nb.ox, nb.oy,
+                            nb.ox + m.def.width * 32,
+                            nb.oy + m.def.height * 32 }
+    end
   end
 
   -- Builds are asynchronous (ChunkMesher.pump runs in the pipeline's
@@ -483,10 +500,10 @@ function VoxelScene.prefetch(state)
   end
   local nbMesh, nbWater = {}, {}
   for i, nb in ipairs(state.neighbors or {}) do
-    ChunkMesher.request(nb.map, true)
-    nbMesh[i], nbWater[i] = ChunkMesher.pair(nb.map, true)
+    if nbMap(nb) then ChunkMesher.request(nbMap(nb), true) end
+    nbMesh[i], nbWater[i] = nbMap(nb) and ChunkMesher.pair(nbMap(nb), true)
     if not nbMesh[i] then
-      nbMesh[i], nbWater[i] = ChunkMesher.pair(nb.map, false)
+      nbMesh[i], nbWater[i] = nbMap(nb) and ChunkMesher.pair(nbMap(nb), false)
     end
   end
   Voxel.ready = terrain ~= nil
@@ -506,34 +523,54 @@ end
 -- below). Only that one entry gets the see-through treatment: NPCs and the
 -- ghosts standing on a neighbour map are left to honest occlusion, because
 -- it is only your own character you cannot afford to lose behind a roof.
+-- Gen 1 NPC/Player both implement pose(). Gen 2 NPCs do; Gen 2 Player does
+-- not -- synthesize the same seven-tuple from its public fields.
+local function entityPose(e)
+  if not e then return nil end
+  if type(e.pose) == "function" then
+    return e:pose()
+  end
+  if not e.sprite then return nil end
+  local phase = 0
+  if type(e.walkPhase) == "function" then
+    local ok, p = pcall(e.walkPhase, e)
+    if ok and p then phase = p end
+  end
+  return e.sprite, e.px or 0, e.py or 0, e.facing or "down",
+         phase, e.stepFlip, false
+end
+
 local function posesOf(state, spriteColors)
   local colors = spriteColors(state.map)
   local posed = {}
   local me = nil
   for _, g in ipairs(state.ghosts or {}) do
-    local sprite, vx, vy, facing, phase, flip = g.npc:pose()
-    posed[#posed + 1] = {
-      sprite = sprite, px = vx + g.ox, py = g.npc.py + g.oy,
-      facing = facing, phase = phase, flip = flip,
-      gh = groundAt(g.map or state.map, g.npc.cellX, g.npc.cellY),
-      lift = g.npc.py - vy, colors = spriteColors(g.map or state.map),
-    }
+    if g.npc then
+      local sprite, vx, vy, facing, phase, flip = entityPose(g.npc)
+      if sprite then
+        posed[#posed + 1] = {
+          sprite = sprite, px = vx + (g.ox or 0), py = (g.npc.py or vy) + (g.oy or 0),
+          facing = facing, phase = phase, flip = flip,
+          gh = groundAt(g.map or state.map, g.npc.cellX, g.npc.cellY),
+          lift = (g.npc.py or vy) - vy, colors = spriteColors(g.map or state.map),
+        }
+      end
+    end
   end
   for _, e in ipairs(state.entities or {}) do
     if not (state.flyAnim and e == state.player) then
-      local sprite, vx, vy, facing, phase, flip = e:pose()
-      posed[#posed + 1] = {
-        sprite = sprite, px = vx, py = e.py,
-        facing = facing, phase = phase, flip = flip,
-        gh = groundAt(state.map, e.cellX, e.cellY),
-        lift = e.py - vy, colors = colors,
-      }
-      if e == state.player then
-        me = posed[#posed]
-        -- marked so the camera draw can leave the card out in first
-        -- person, where it would fill the lens from inside; the SUN pass
-        -- reads the same list and deliberately does not check the mark
-        me.isPlayer = true
+      local sprite, vx, vy, facing, phase, flip = entityPose(e)
+      if sprite then
+        posed[#posed + 1] = {
+          sprite = sprite, px = vx, py = e.py or vy,
+          facing = facing, phase = phase, flip = flip,
+          gh = groundAt(state.map, e.cellX or 0, e.cellY or 0),
+          lift = (e.py or vy) - vy, colors = colors,
+        }
+        if e == state.player then
+          me = posed[#posed]
+          me.isPlayer = true
+        end
       end
     end
   end
@@ -625,9 +662,10 @@ local function drawCast(state, posed, atlasFor)
                  ShadowMap.snug(caster))
   end)
   for _, nb in ipairs(state.neighbors or {}) do
-    if ViewBox.showsMap(nb) then
-      eachFigure(nb.map, nb.ox, nb.oy, function(mesh, model, caster)
-        Voxel3D.draw(mesh, atlasFor(nb.map), model, figPull,
+    local nmap = nbMap(nb)
+    if nmap and ViewBox.showsMap(nb) then
+      eachFigure(nmap, nb.ox, nb.oy, function(mesh, model, caster)
+        Voxel3D.draw(mesh, atlasFor(nmap), model, figPull,
                      ShadowMap.snug(caster))
       end)
     end
@@ -819,7 +857,7 @@ local function castShadows(state, terrain, nbMesh, posed, cx, cy, vw, vh,
   -- which is every frame the row is OFF and every headset frame.
   for i, nb in ipairs(state.neighbors or {}) do
     if ViewBox.showsMap(nb) then
-      ShadowMap.draw(nbMesh[i], atlasFor(nb.map),
+      ShadowMap.draw(nbMesh[i], nbMap(nb) and atlasFor(nbMap(nb)),
                      Mat4.translate(nb.ox, 0, nb.oy))
     end
   end
@@ -830,7 +868,7 @@ local function castShadows(state, terrain, nbMesh, posed, cx, cy, vw, vh,
   ShadowMap.draw(water, atlasFor(state.map), nil)
   for i, nb in ipairs(state.neighbors or {}) do
     if ViewBox.showsMap(nb) then
-      ShadowMap.draw(nbWater and nbWater[i], atlasFor(nb.map),
+      ShadowMap.draw(nbWater and nbWater[i], nbMap(nb) and atlasFor(nbMap(nb)),
                      Mat4.translate(nb.ox, 0, nb.oy))
     end
   end
@@ -844,7 +882,7 @@ local function castShadows(state, terrain, nbMesh, posed, cx, cy, vw, vh,
                  ShadowMap.snug(nil))
   for _, nb in ipairs(state.neighbors or {}) do
     if ViewBox.showsMap(nb) then
-      ShadowMap.draw(ChunkMesher.flowers(nb.map), atlasFor(nb.map),
+      ShadowMap.draw(nbMap(nb) and ChunkMesher.flowers(nbMap(nb)), nbMap(nb) and atlasFor(nbMap(nb)),
                      ShadowMap.snug(Mat4.translate(nb.ox, 0, nb.oy)))
     end
   end
@@ -859,9 +897,10 @@ local function castShadows(state, terrain, nbMesh, posed, cx, cy, vw, vh,
     ShadowMap.draw(mesh, atlasFor(state.map), ShadowMap.snug(caster))
   end)
   for _, nb in ipairs(state.neighbors or {}) do
-    if ViewBox.showsMap(nb) then
-      eachFigure(nb.map, nb.ox, nb.oy, function(mesh, _, caster)
-        ShadowMap.draw(mesh, atlasFor(nb.map), ShadowMap.snug(caster))
+    local nmap = nbMap(nb)
+    if nmap and ViewBox.showsMap(nb) then
+      eachFigure(nmap, nb.ox, nb.oy, function(mesh, _, caster)
+        ShadowMap.draw(mesh, atlasFor(nmap), ShadowMap.snug(caster))
       end)
     end
   end
@@ -1039,7 +1078,7 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
   -- about which neighbours are in this frame (see ViewBox.showsMap)
   for i, nb in ipairs(state.neighbors or {}) do
     if ViewBox.showsMap(nb) then
-      Voxel3D.draw(nbMesh[i], atlasFor(nb.map),
+      Voxel3D.draw(nbMesh[i], nbMap(nb) and atlasFor(nbMap(nb)),
                    Mat4.translate(nb.ox, 0, nb.oy))
     end
   end
@@ -1078,7 +1117,7 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
   end
   for i, nb in ipairs(state.neighbors or {}) do
     if nbWater and nbWater[i] and ViewBox.showsMap(nb) then
-      waterDraws[#waterDraws + 1] = { nbWater[i], atlasFor(nb.map),
+      waterDraws[#waterDraws + 1] = { nbWater[i], nbMap(nb) and atlasFor(nbMap(nb)),
                                       Mat4.translate(nb.ox, 0, nb.oy) }
     end
   end
@@ -1212,7 +1251,7 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
   Voxel3D.draw(ChunkMesher.grass(state.map), atlasFor(state.map), nil, pull)
   for _, nb in ipairs(state.neighbors or {}) do
     if ViewBox.showsMap(nb) then
-      Voxel3D.draw(ChunkMesher.grass(nb.map), atlasFor(nb.map),
+      Voxel3D.draw(nbMap(nb) and ChunkMesher.grass(nbMap(nb)), nbMap(nb) and atlasFor(nbMap(nb)),
                    Mat4.translate(nb.ox, 0, nb.oy), pull)
     end
   end
@@ -1235,7 +1274,7 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
                fpull, ShadowMap.snug(nil))
   for _, nb in ipairs(state.neighbors or {}) do
     if ViewBox.showsMap(nb) then
-      Voxel3D.draw(ChunkMesher.flowers(nb.map), atlasFor(nb.map),
+      Voxel3D.draw(nbMap(nb) and ChunkMesher.flowers(nbMap(nb)), nbMap(nb) and atlasFor(nbMap(nb)),
                    Mat4.translate(nb.ox, 0, nb.oy), fpull,
                    ShadowMap.snug(Mat4.translate(nb.ox, 0, nb.oy)))
     end

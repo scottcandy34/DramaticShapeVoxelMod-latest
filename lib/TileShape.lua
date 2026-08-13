@@ -41,6 +41,8 @@
 -- the mod namespace (see main.lua): V.data loads a shipped data file
 local V = ...
 
+local Assets = require("src.render.Assets")
+
 local TileShape = {}
 
 -- class -> height fallbacks, used when data/voxel_heights.lua is missing
@@ -53,6 +55,8 @@ local FALLBACK_HEIGHTS = {
   fence = 10,
   sign = 12,
   wall = 16,
+  -- Indoor room box exterior (Structures.indoorShell)
+  shell = 32,
   tree = 16,
   -- masonry drawn TWO courses tall: the Indigo Plateau's rim and the
   -- badge-check gates down Route 23 are drawn 32px, the same height as a
@@ -155,6 +159,7 @@ local ART = {
   ledge = "top",
   roof = "top",
   wall = "upright",
+  shell = "upright",
   cliff = "upright",
   tree = "upright",
   fence = "upright",
@@ -246,6 +251,64 @@ local function load()
   return spec or nil
 end
 
+-- Gold extractor ids look like TILESET_JOHTO / TILESET_HOUSE.
+-- Profile keys are mixed: TilesetJohto (outdoor), HOUSE / LAB / POKECENTER
+-- (Gen 1 indoor names reused for Gold where the art is close enough).
+local PROFILE_ALIASES = {
+  TILESET_JOHTO = "TilesetJohto",
+  TILESET_JOHTO_MODERN = "TilesetJohtoModern",
+  TILESET_KANTO = "TilesetKanto",
+  TILESET_HOUSE = "TilesetHouse",
+  TILESET_TRADITIONAL_HOUSE = "TilesetHouse",
+  TILESET_PLAYERS_HOUSE = "TilesetPlayersHouse",
+  TILESET_PLAYERS_ROOM = "TilesetPlayersRoom",
+  TILESET_LAB = "TilesetLab",
+  TILESET_POKECENTER = "TilesetPokecenter",
+  TILESET_MART = "TilesetMart",
+  TILESET_GATE = "GATE",
+  TILESET_MANSION = "MANSION",
+  TILESET_FACILITY = "FACILITY",
+  TILESET_UNDERGROUND = "UNDERGROUND",
+  TILESET_CAVE = "CAVERN",
+  TILESET_DARK_CAVE = "CAVERN",
+  TILESET_FOREST = "TilesetForest",
+  TILESET_TOWER = "TilesetTower",
+  TILESET_PORT = "SHIP_PORT",
+  TILESET_LIGHTHOUSE = "TilesetLighthouse",
+  TILESET_GAME_CORNER = "CLUB",
+  TILESET_TRAIN_STATION = "LOBBY",
+  TILESET_RADIO_TOWER = "FACILITY",
+  TILESET_CHAMPIONS_ROOM = "GYM",
+  TILESET_ELITE_FOUR_ROOM = "TilesetEliteFourRoom",
+  TILESET_ICE_PATH = "CAVERN",
+  TILESET_PARK = "TilesetPark",
+  TILESET_RUINS_OF_ALPH = "TilesetRuinsOfAlph",
+}
+
+local function profileTilesetId(id)
+  if not id then return id end
+  local s = load()
+  local tilesets = s and s.tilesets
+  if tilesets and tilesets[id] then return id end
+  if type(id) ~= "string" then return id end
+
+  local alias = PROFILE_ALIASES[id]
+  if alias and tilesets and tilesets[alias] then return alias end
+
+  if id:match("^TILESET_") then
+    local rest = id:sub(9)
+    -- TILESET_HOUSE -> HOUSE, TILESET_POKECENTER -> POKECENTER
+    if tilesets and tilesets[rest] then return rest end
+    local parts = {}
+    for part in rest:gmatch("[^_]+") do
+      parts[#parts + 1] = part:sub(1, 1) .. part:sub(2):lower()
+    end
+    local camel = "Tileset" .. table.concat(parts)
+    if tilesets and tilesets[camel] then return camel end
+  end
+  return id
+end
+
 function TileShape.heights()
   local s = load()
   local out = {}
@@ -261,7 +324,7 @@ end
 -- should degrade to the derived default, not invent a zero-height class.
 local function authoredGroups(tilesetId, heights)
   local s = load()
-  local entry = s and s.tilesets and s.tilesets[tilesetId]
+  local entry = s and s.tilesets and s.tilesets[profileTilesetId(tilesetId)]
   local out = {}
   if not entry then return out end
   for class, tiles in pairs(entry) do
@@ -297,7 +360,7 @@ end
 -- nothing else (336 vs 352, clean).
 local function authoredConditions(tilesetId, heights)
   local s = load()
-  local entry = s and s.tilesets and s.tilesets[tilesetId]
+  local entry = s and s.tilesets and s.tilesets[profileTilesetId(tilesetId)]
   if type(entry) ~= "table" then return nil end
   local out, any = {}, false
 
@@ -348,6 +411,13 @@ function TileShape.forMap(map)
   local tileset = map.tileset
   local id = tileset.id
   if cache[id] then return cache[id] end
+  do
+    local pid = profileTilesetId(id)
+    if V and V.dlog and not TileShape._logged then
+      TileShape._logged = true
+      V.dlog(("TileShape profile id=%s -> %s"):format(tostring(id), tostring(pid)))
+    end
+  end
 
   local heights = TileShape.heights()
   -- Per-tileset height overrides (a tileset entry's `heights`): the class
@@ -358,7 +428,7 @@ function TileShape.forMap(map)
   -- Same gate as the global list: known classes, numbers only.
   do
     local s = load()
-    local entry = s and s.tilesets and s.tilesets[id]
+    local entry = s and s.tilesets and s.tilesets[profileTilesetId(id)]
     local over = entry and entry.heights
     if type(over) == "table" then
       for class, h in pairs(over) do
@@ -368,9 +438,19 @@ function TileShape.forMap(map)
       end
     end
   end
-  local authored = authoredGroups(id, heights)
-  local count = math.floor((tileset.imageWidth or 128) / 8)
-                * math.floor((tileset.imageHeight or 48) / 8)
+  local authored = authoredGroups(profileTilesetId(id), heights)
+  -- Gen 2 tilesets often omit imageWidth/Height; measure the sheet so
+  -- high tile ids still receive pins (defaults are Gen 1 OVERWORLD size).
+  local iw, ih = tileset.imageWidth, tileset.imageHeight
+  if not (iw and ih) and tileset.image then
+    pcall(function()
+      local img = Assets.imageData(tileset.image)
+      iw, ih = img:getDimensions()
+    end)
+  end
+  local perRow = tileset.tilesPerRow or 16
+  local count = math.floor((iw or (perRow * 8)) / 8)
+                * math.floor((ih or 48) / 8)
 
   -- derived pin: a tile the tileset animates by FRAME REWRITE (the
   -- overworld's flower) is already named by its animation spec, so like
@@ -409,19 +489,33 @@ function TileShape.forMap(map)
       end
     end
   end
+  -- Gen 2 tilesets carry a collision class per cell. Map those classes to
+  -- shapes once so TileShape.at can resolve by cellTile (COLL_*) rather than
+  -- Gen 1 tile-id walkable lists. Original gen1recomp Gen2 Map:cellTile
+  -- returns COLL_* bytes; without this path every outdoor cell is "wall".
+  if tileset.collision then
+    local s = load()
+    for class, name in pairs((s and s.collision) or {}) do
+      if type(name) == "string" and FALLBACK_HEIGHTS[name] then
+        shapes.coll = shapes.coll or {}
+        shapes.coll[class] = shapeFor(name, heights, true)
+      end
+    end
+  end
+  -- Gen 1 names water and floor by TILE ID; Gen 2 by collision class. Only
+  -- apply per-tile water/walkable fallbacks when there is no collision table.
+  local perTile = not tileset.collision
   for t = 0, count - 1 do
     local class = authored[t]
     if class then
       shapes[t] = shapeFor(class, heights, true)
-    elseif t == tileset.grassTile then
-      -- derived pin: every tileset already names its tall-grass tile, so
-      -- the standing-tuft treatment needs no profile entry anywhere
+    elseif perTile and t == tileset.grassTile then
       shapes[t] = shapeFor("grass", heights, true)
     elseif flowerTiles[t] then
       shapes[t] = shapeFor("flower", heights, true)
-    elseif map.waterTiles and map.waterTiles[t] then
+    elseif perTile and map.waterTiles and map.waterTiles[t] then
       shapes[t] = shapes.classes.water
-    elseif map.walkable and map.walkable[t] then
+    elseif perTile and map.walkable and map.walkable[t] then
       shapes[t] = shapes.classes.ground
     else
       shapes[t] = shapes.classes.wall
@@ -430,6 +524,119 @@ function TileShape.forMap(map)
   shapes.count = count
   cache[id] = shapes
   return shapes
+end
+
+-- SEALED POCKETS: the inside of a mountain (Gen 2).
+--
+-- Gen 2 draws a rocky mass as a RING of solid cells around cells that are
+-- still marked walkable.  Flood open cells inward from the map edge; what
+-- the flood never reaches is filled so the ring becomes a mass with a top.
+-- Pockets with warps or objects are left alone (walled yards, not rock).
+local sealCache = setmetatable({}, { __mode = "k" })
+
+local function sealedCells(map)
+  local hit = sealCache[map]
+  if hit ~= nil then return hit or nil end
+  local w, h = map.widthCells, map.heightCells
+  if not (w and h and w > 0 and h > 0) then
+    sealCache[map] = false
+    return nil
+  end
+
+  local sealed = {}
+  for cy = 0, h - 1 do
+    for cx = 0, w - 1 do
+      local ok, walk = pcall(function()
+        return map:isWalkableCell(cx, cy) or map:isWaterCell(cx, cy)
+      end)
+      if ok and walk then
+        sealed[cy * w + cx] = true
+      end
+    end
+  end
+
+  local queue, n = {}, 0
+  local function seed(cx, cy)
+    if cx < 0 or cy < 0 or cx >= w or cy >= h then return end
+    local k = cy * w + cx
+    if sealed[k] then
+      sealed[k] = nil
+      n = n + 1
+      queue[n] = k
+    end
+  end
+  for cx = 0, w - 1 do seed(cx, 0); seed(cx, h - 1) end
+  for cy = 0, h - 1 do seed(0, cy); seed(w - 1, cy) end
+
+  local head = 0
+  while head < n do
+    head = head + 1
+    local k = queue[head]
+    local cx, cy = k % w, math.floor(k / w)
+    seed(cx - 1, cy); seed(cx + 1, cy)
+    seed(cx, cy - 1); seed(cx, cy + 1)
+  end
+
+  -- pockets with a warp or object are player-reachable rooms, not rock
+  local seeds = {}
+  for k in pairs(sealed) do
+    local cx, cy = k % w, math.floor(k / w)
+    local hasWarp = false
+    pcall(function()
+      if map.warpAt and map.warpAt[k] then hasWarp = true end
+      if map.warpAtCell and map:warpAtCell(cx, cy) then hasWarp = true end
+    end)
+    if hasWarp then seeds[#seeds + 1] = k end
+  end
+  for _, obj in ipairs((map.def and map.def.objects) or {}) do
+    local cx, cy = tonumber(obj.x), tonumber(obj.y)
+    if cx and cy and cx >= 0 and cy >= 0 and cx < w and cy < h then
+      seeds[#seeds + 1] = cy * w + cx
+    end
+  end
+  local reachable = {}
+  for _, k in ipairs(seeds) do
+    if sealed[k] then reachable[#reachable + 1] = k end
+  end
+  for _, k in ipairs(reachable) do
+    n = n + 1
+    queue[n] = k
+    sealed[k] = nil
+  end
+  while head < n do
+    head = head + 1
+    local k = queue[head]
+    local cx, cy = k % w, math.floor(k / w)
+    seed(cx - 1, cy); seed(cx + 1, cy)
+    seed(cx, cy - 1); seed(cx, cy + 1)
+  end
+
+  if next(sealed) == nil then sealed = false end
+  sealCache[map] = sealed
+  return sealed or nil
+end
+
+-- Hop lip: neighbour COLL decides knee-high ledge vs cliff face.
+local HOP_LIP = {
+  { -1, 0, { [0xA0] = true, [0xA4] = true } },
+  { 1, 0, { [0xA1] = true, [0xA5] = true } },
+  { 0, -1, { [0xA3] = true, [0xA4] = true, [0xA5] = true } },
+}
+
+local outdoorCache = setmetatable({}, { __mode = "k" })
+local function hopLipsApply(map)
+  local hit = outdoorCache[map]
+  if hit == nil then
+    local s = load()
+    local tid = map.tileset and map.tileset.id
+    local entry = s and s.tilesets and s.tilesets[profileTilesetId(tid)]
+    local ok, outdoor = pcall(function()
+      return map.def ~= nil and require("src.world.Map").isOutdoor(map.def)
+    end)
+    hit = (entry and entry.hop_lips == true) or (ok and outdoor) or false
+    outdoorCache[map] = hit
+  end
+  return hit
 end
 
 -- The shape of the tile at TILE coordinates (tx, ty) -- the full
@@ -459,11 +666,47 @@ function TileShape.at(map, shapes, tile, tx, ty)
       end
     end
   end
-  if not s or s.authored then return s end
+  if not s then return s end
   local cx = math.floor(tx / 2)
   local cy = math.floor(ty / 2)
-  if map:isWaterCell(cx, cy) then return shapes.classes.water end
-  if map:isWalkableCell(cx, cy) then return shapes.classes.ground end
+  -- Hop lip outranks the tile pin outdoors (neighbour COLL decides ledge).
+  if shapes.coll and shapes.classes.ledge and hopLipsApply(map) then
+    local solid = true
+    pcall(function()
+      solid = not map:isWalkableCell(cx, cy) and not map:isWaterCell(cx, cy)
+    end)
+    if solid then
+      for _, rule in ipairs(HOP_LIP) do
+        local ok, coll = pcall(function()
+          return map:cellTile(cx + rule[1], cy + rule[2])
+        end)
+        if ok and rule[3][coll] then
+          return shapes.classes.ledge
+        end
+      end
+    end
+  end
+  if s.authored then return s end
+  -- Sealed mountain interior: force wall so pits get a top
+  local sealed = sealedCells(map)
+  if sealed and map.widthCells and sealed[cy * map.widthCells + cx] then
+    return shapes.classes.wall
+  end
+  -- Gen 2: cellTile is a COLL_* class; shapes.coll maps those to voxel classes
+  if shapes.coll then
+    local ok, coll = pcall(function() return map:cellTile(cx, cy) end)
+    if ok then
+      local cs = shapes.coll[coll]
+      if cs then return cs end
+    end
+  end
+  local water, walk = false, false
+  pcall(function()
+    water = map:isWaterCell(cx, cy)
+    walk = map:isWalkableCell(cx, cy)
+  end)
+  if water then return shapes.classes.water end
+  if walk then return shapes.classes.ground end
   return s
 end
 
@@ -628,7 +871,7 @@ function TileShape.figures(tilesetId)
   if hit ~= nil then return hit or nil end
 
   local s = load()
-  local entry = s and s.tilesets and s.tilesets[tilesetId]
+  local entry = s and s.tilesets and s.tilesets[profileTilesetId(tilesetId)]
   local out = authoredMasks(entry and entry.figures)
 
   figCache[tilesetId] = (#out > 0) and out or false
@@ -668,7 +911,7 @@ function TileShape.mounted(tilesetId)
   if hit ~= nil then return hit or nil end
 
   local s = load()
-  local entry = s and s.tilesets and s.tilesets[tilesetId]
+  local entry = s and s.tilesets and s.tilesets[profileTilesetId(tilesetId)]
   local out = authoredMasks(entry and entry.mounted)
 
   mntCache[tilesetId] = (#out > 0) and out or false
@@ -697,7 +940,7 @@ function TileShape.propBg(tilesetId)
   if hit ~= nil then return hit or nil end
 
   local s = load()
-  local entry = s and s.tilesets and s.tilesets[tilesetId]
+  local entry = s and s.tilesets and s.tilesets[profileTilesetId(tilesetId)]
   local list = entry and entry.prop_bg
   local out, any = {}, false
   if type(list) == "table" then
@@ -742,7 +985,7 @@ end
 -- the Plateau's gate walls are cut into a hillside.
 function TileShape.bookcaseBackfill(tilesetId)
   local s = load()
-  local entry = s and s.tilesets and s.tilesets[tilesetId]
+  local entry = s and s.tilesets and s.tilesets[profileTilesetId(tilesetId)]
   local mode = entry and entry.bookcase_backfill
   return mode == "above" and mode or nil
 end
@@ -760,7 +1003,7 @@ end
 --- carves the surface instead of describing it.
 function TileShape.bookcaseRelief(tilesetId)
   local s = load()
-  local entry = s and s.tilesets and s.tilesets[tilesetId]
+  local entry = s and s.tilesets and s.tilesets[profileTilesetId(tilesetId)]
   return not (entry and entry.bookcase_relief == false)
 end
 
@@ -794,7 +1037,7 @@ end
 ---                              not what a shop wall caps with.
 function TileShape.wallTop(tilesetId)
   local s = load()
-  local entry = s and s.tilesets and s.tilesets[tilesetId]
+  local entry = s and s.tilesets and s.tilesets[profileTilesetId(tilesetId)]
   local spec = entry and entry.wall_top
   if type(spec) == "number" then
     return function() return spec end

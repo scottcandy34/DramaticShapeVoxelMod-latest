@@ -46,6 +46,31 @@ local mod = ...
 
 local V = { mod = mod, path = mod.path }
 
+-- ------- file log (Windows GUI builds have no console for print)
+-- Writes to the LÖVE save directory as dramatic_shape.log so diagnostics
+-- survive when the .exe detaches from the terminal.
+local LOG_NAME = "dramatic_shape.log"
+local function dlog(msg)
+  msg = tostring(msg)
+  print("[DRAMATIC_SHAPE] " .. msg)
+  local ok, err = pcall(function()
+    if not (love and love.filesystem) then return end
+    local line = os.date("%H:%M:%S") .. " " .. msg .. "\n"
+    local prev = love.filesystem.read(LOG_NAME) or ""
+    -- keep last ~100 KB
+    if #prev > 100000 then prev = prev:sub(-50000) end
+    love.filesystem.write(LOG_NAME, prev .. line)
+  end)
+  if not ok then print("[DRAMATIC_SHAPE] log write failed: " .. tostring(err)) end
+end
+V.dlog = dlog
+dlog("main.lua loading path=" .. tostring(mod.path) .. " id=" .. tostring(mod.id))
+pcall(function()
+  if love and love.filesystem and love.filesystem.getSaveDirectory then
+    dlog("saveDir=" .. tostring(love.filesystem.getSaveDirectory()))
+  end
+end)
+
 local function chunkFor(rel)
   local source = mod:read(rel)
   if not source then
@@ -171,6 +196,7 @@ local function isGen2()
   end
   return false
 end
+dlog("isGen2=" .. tostring(isGen2()) .. " at load")
 
 -- Live overworld / world, Gen 1 or Gen 2 (Gen2Compat maps .overworld -> .world)
 local function liveWorld()
@@ -183,7 +209,7 @@ local function safeCall(label, fn, ...)
   if type(fn) ~= "function" then return end
   local ok, err = pcall(fn, ...)
   if not ok then
-    print(("[DRAMATIC_SHAPE] %s failed: %s"):format(label, tostring(err)))
+    dlog(("%s failed: %s"):format(label, tostring(err)))
   end
   return ok
 end
@@ -226,6 +252,12 @@ mod.content.render_pipelines:register("voxel", {
   -- pump slice -- so stepping out of a door lands on terrain that is
   -- already there instead of a flat flash.
   update = function(dt, level)
+    if not V._updLogged then
+      V._updLogged = true
+      local okA, avail = pcall(function() return Voxel3D.available() end)
+      dlog(("voxel update first tick level=%s available=%s isGen2=%s"):format(
+        tostring(level), okA and tostring(avail) or tostring(avail), tostring(isGen2())))
+    end
     -- FULL is a preset, so it is applied ON THE PRESS rather than held every
     -- frame: it SETS the other rows and then leaves them alone. Holding them
     -- would make the zoom keys and the wheel dead while the mode was on, and
@@ -347,9 +379,62 @@ mod.content.render_pipelines:register("voxel", {
     -- canvas it was handed, so the sky's dither, the water's march and the
     -- camera itself all come out the same picture at a higher sample rate.
     local rw, rh = AntiAlias.expand(sw, sh)
-    local canvas = VoxelScene.render(ctx.state, rw, rh,
+    local st = ctx.state
+    -- Gen2: first frames often return nil while async mesh jobs cook, or
+    -- permanently if the build failed (false-cached). Log once with enough
+    -- detail to see which, and kick a sync build so the failure reason
+    -- surfaces instead of an endless 2D fallback.
+    if isGen2() and st and st.map and not V._meshKick then
+      V._meshKick = true
+      local map = st.map
+      local ts = map.tileset
+      local sample = nil
+      pcall(function() sample = map:tileAt(0, 0) end)
+      dlog(("meshKick map=%s tileset=%s hasBlocks=%s tileAt00=%s"):format(
+        tostring(map.id),
+        tostring(ts and ts.id),
+        tostring(ts and ts.blocks ~= nil),
+        tostring(sample)))
+      local okB, errB = pcall(function()
+        ChunkMesher.request(map, true, {}, true)
+        ChunkMesher.request(map, false, {}, true)
+        -- spend a longer slice so the first mesh can land this frame
+        for _ = 1, 30 do
+          ChunkMesher.pump(true)
+          if ChunkMesher.pair(map, true) or ChunkMesher.pair(map, false) then
+            break
+          end
+        end
+      end)
+      if not okB then dlog("meshKick error: " .. tostring(errB)) end
+      local body, full = ChunkMesher.pair(map, true), select(1, ChunkMesher.pair(map, false))
+      dlog(("meshKick after pump pending=%s body=%s full=%s"):format(
+        tostring(ChunkMesher.pending()),
+        tostring(body ~= nil),
+        tostring(full ~= nil)))
+    end
+
+    local canvas = VoxelScene.render(st, rw, rh,
                                      ctx.vw, ctx.vh, ctx.paletteFor)
-    if not canvas then return nil end   -- fall back to the 2D path
+    if not canvas then
+      if not V._nilDrawLogged then
+        V._nilDrawLogged = true
+        local map = st and st.map
+        local body = map and select(1, ChunkMesher.pair(map, true))
+        local full = map and select(1, ChunkMesher.pair(map, false))
+        dlog(("drawWorld nil canvas map=%s pending=%s body=%s full=%s"):format(
+          tostring(map and map.id),
+          tostring(ChunkMesher.pending()),
+          tostring(body ~= nil),
+          tostring(full ~= nil)))
+      end
+      return nil
+    end
+    if not V._drawOkLogged then
+      V._drawOkLogged = true
+      dlog(("drawWorld 3D ok map=%s"):format(
+        tostring(st and st.map and st.map.id)))
+    end
     if Voxel3D.beginOverlay() then
       -- the FX closures are ordinary 2D draws sized in DISPLAY pixels, and
       -- they are drawing into the supersampled canvas alongside everything
@@ -373,7 +458,7 @@ mod.content.render_pipelines:register("voxel", {
     if not ok then
       if not V.drawWorldWarned then
         V.drawWorldWarned = true
-        print(("[DRAMATIC_SHAPE] drawWorld 3D failed (Gen2 2D canvas fallback): %s"):format(tostring(result)))
+        dlog(("drawWorld 3D failed (Gen2 2D canvas fallback): %s"):format(tostring(result)))
       end
       -- Gen 2: worldPresent (T-SHIFT) only runs when drawWorld returns a
       -- canvas. Capture the engine's own 2D world so T-SHIFT and the VOXEL
@@ -951,13 +1036,21 @@ mod.hooks:wrap("ui.options.rows", function(next, game, rows)
         if type(row) == "table" and row.id then have[row.id] = true end
       end
       local okRows, pipeRows = pcall(Pipelines.rows, game)
+      local added = 0
       if okRows and type(pipeRows) == "table" then
         for _, row in ipairs(pipeRows) do
           if type(row) == "table" and row.id and not have[row.id] then
             out[#out + 1] = row
             have[row.id] = true
+            added = added + 1
           end
         end
+      end
+      if not V._optsLogged then
+        V._optsLogged = true
+        dlog(("options.rows Gen2: okRows=%s added=%s list=%s"):format(
+          tostring(okRows), tostring(added),
+          okRows and type(pipeRows)=="table" and tostring(#pipeRows) or tostring(pipeRows)))
       end
     end
     -- still drop engine TILT/GBCFX if present; soft so a miss cannot hide VOXEL

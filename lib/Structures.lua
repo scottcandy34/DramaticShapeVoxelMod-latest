@@ -126,6 +126,58 @@ local function voidTiles(tileset)
   return set
 end
 
+-- THE FOUR WALLS OF A ROOM (from Gen2-3D-Sprites / reference).
+-- A GSC interior only draws the north wall band; east/west/south are blank
+-- in 2D. borderBlock is often the room floor, so meshing it as a ring made
+-- a lawn of lino / blocky floor extending into the dark void. Build a one-
+-- cell shell from the room's own wall art, and leave pure void past it.
+local function isIndoorMap(def)
+  if not def then return false end
+  local env = def.environment or def.env
+  if type(env) == "string" then
+    local u = env:upper()
+    if u == "INDOOR" or u == "DUNGEON" or u == "CAVE" then return true end
+    if u == "TOWN" or u == "ROUTE" or u == "OUTDOOR" then return false end
+  end
+  local ok, outdoor = pcall(function()
+    local Map = require("src.world.Map")
+    if Map.isOutdoor then return Map.isOutdoor(def) end
+    if Map.isOutside then return Map.isOutside(def) end
+    return false
+  end)
+  if ok then return not outdoor end
+  return false
+end
+
+local function indoorShell(map, shapes)
+  local def = map.def
+  if not def or not isIndoorMap(def) then return nil end
+  local counts, quads = {}, {}
+  local w = (def.width or 0) * 2
+  if w <= 0 then return nil end
+  for cx = 0, w - 1 do
+    local tx = cx * 2
+    local ok2, tile = pcall(function() return map:tileAt(tx, 1) end)
+    if ok2 and tile ~= nil then
+      local s = TileShape.at(map, shapes, tile, tx, 1)
+      -- Authored walls count too (pure-black wall pins)
+      if s and s.art == "upright" then
+        local nw = map:tileAt(tx, 0)
+        counts[nw] = (counts[nw] or 0) + 1
+        quads[nw] = quads[nw]
+          or { nw, map:tileAt(tx + 1, 0), map:tileAt(tx, 1), map:tileAt(tx + 1, 1) }
+      end
+    end
+  end
+  local best, bestN = nil, 0
+  for tile, n in pairs(counts) do
+    if n > bestN then best, bestN = tile, n end
+  end
+  return best and quads[best] or nil
+end
+
+local SHELL = 2
+
 -- ----------------------------------------------------------------- build --
 
 local DIRS4 = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
@@ -163,7 +215,10 @@ function Structures.forMap(map)
   -- that `false`, which threw, failed the mesh build for every map on the
   -- route, and dropped the mode to the flat 2D path entirely.)
   local TileRenderer = require("src.render.TileRenderer")
-  local borderId = TileRenderer.borderBlockFor(map)
+  local borderId = TileRenderer.borderBlockFor and TileRenderer.borderBlockFor(map)
+  -- Gen 2 outdoor maps: borderBlockFor only special-cases OVERWORLD; use
+  -- the map header border when that returns the ordinary borderBlock.
+  if borderId == nil and map.def then borderId = map.def.borderBlock end
   local borderBlk = borderId and tileset.blocks[borderId + 1] or nil
   -- TREES fill stops at ROUND_RING instead of running the full RING.
   -- Only that far out does a tree cell get carved into a hull; past it
@@ -180,13 +235,73 @@ function Structures.forMap(map)
   -- WATER and the other tilesets' own borders keep the full ring: a flat
   -- sheet of water is what water looks like from above anyway, and an
   -- interior's border is black already.
-  local hullRingOnly = borderBlk and def.tileset == "OVERWORLD"
-                       and (TileRenderer.voidFill or "trees") == "trees"
+  local outdoorTs = def.tileset == "OVERWORLD"
+    or (type(def.tileset) == "string" and (
+         def.tileset:find("JOHTO") or def.tileset:find("KANTO")
+         or def.tileset:find("PARK") or def.tileset:find("FOREST")
+         or def.tileset:find("OVERWORLD")))
+  if not outdoorTs and def then
+    pcall(function()
+      local Map = require("src.world.Map")
+      if Map.isOutside then outdoorTs = Map.isOutside(def) end
+    end)
+  end
+  -- Gold tree tiles for border/in-map failsafes (Gen2-3D-Sprites)
+  local goldTreeTiles = nil
+  do
+    local okP, prof = pcall(V.data, "voxel_heights")
+    local tilesets = okP and type(prof) == "table" and prof.tilesets
+    local tid = tileset and tileset.id
+    local entry = tilesets and tilesets[tid]
+    if not entry and type(tid) == "string" and tid:match("^TILESET_") then
+      local parts = {}
+      for part in tid:sub(9):gmatch("[^_]+") do
+        parts[#parts + 1] = part:sub(1, 1) .. part:sub(2):lower()
+      end
+      entry = tilesets and tilesets["Tileset" .. table.concat(parts)]
+    end
+    if type(entry) == "table" then
+      local set, any = {}, false
+      for _, class in ipairs({ "cylinder", "planter", "canopy" }) do
+        for _, t in ipairs(type(entry[class]) == "table" and entry[class] or {}) do
+          set[t] = true
+          any = true
+        end
+      end
+      if any then goldTreeTiles = set end
+    end
+  end
+  local goldTreeBorder = false
+  if borderBlk and goldTreeTiles then
+    local hits = 0
+    for _, t in ipairs(borderBlk) do
+      if goldTreeTiles[t] then hits = hits + 1 end
+    end
+    goldTreeBorder = hits >= 2
+  end
+  local hullRingOnly = borderBlk and (
+    (outdoorTs and (TileRenderer.voidFill or "trees") == "trees")
+    or goldTreeBorder)
+  local shell = indoorShell(map, shapes)
+  -- Even if shell measurement fails, indoor maps must not mesh borderBlock
+  -- (usually the room floor) into the void — that is the blocky apron.
+  local indoorNoBorder = shell ~= nil or isIndoorMap(def)
   local tw2, th2 = tw, th
+  local function inShell(tx, ty)
+    return shell ~= nil
+      and not (tx >= 0 and ty >= 0 and tx < tw2 and ty < th2)
+      and tx >= -SHELL and ty >= -SHELL
+      and tx < tw2 + SHELL and ty < th2 + SHELL
+  end
   local function tileLookup(tx, ty)
     if tx >= 0 and ty >= 0 and tx < tw2 and ty < th2 then
       return map:tileAt(tx, ty)
     end
+    if inShell(tx, ty) then
+      return shell[(ty % 2) * 2 + (tx % 2) + 1]
+    end
+    -- Indoor: pure void past the body/shell — never a floor border ring
+    if indoorNoBorder then return nil end
     if not borderBlk then return nil end
     if hullRingOnly and (tx < -ROUND_RING or ty < -ROUND_RING
                          or tx >= tw2 + ROUND_RING
@@ -202,11 +317,65 @@ function Structures.forMap(map)
       local tile = tileLookup(tx, ty)
       if tile then
         local k = keyOf(tx, ty)
-        local s = TileShape.at(map, shapes, tile, tx, ty)
-        if s and void and void[tile] and not s.authored then
-          s = shapes.classes.void
+        local s
+        if inShell(tx, ty) then
+          s = shapes.classes.shell
+        else
+          s = TileShape.at(map, shapes, tile, tx, ty)
+          if s and void and void[tile] and not s.authored then
+            local keepWall = false
+            pcall(function()
+              local Map = require("src.world.Map")
+              local indoor = map.def and Map.isOutside
+                             and not Map.isOutside(map.def)
+              if indoor then
+                local cx, cy = math.floor(tx / 2), math.floor(ty / 2)
+                keepWall = not map:isWalkableCell(cx, cy)
+                           and not map:isWaterCell(cx, cy)
+              end
+            end)
+            if not keepWall then
+              s = shapes.classes.void
+            end
+          end
+          local outsideBody = tx < 0 or ty < 0 or tx >= tw2 or ty >= th2
+          if outsideBody and goldTreeTiles and s and s.art == "upright"
+             and not s.authored and goldTreeTiles[tile] then
+            s = shapes.classes.cylinder
+          end
         end
         shapeAt[k], tileAt[k] = s, tile
+      end
+    end
+  end
+
+  -- Gold in-map tree failsafe: mostly-tree upright cells → cylinder
+  if goldTreeTiles and outdoorTs then
+    for cy = 0, math.floor((th2 - 1) / 2) do
+      for cx = 0, math.floor((tw2 - 1) / 2) do
+        local tx, ty = cx * 2, cy * 2
+        local k = keyOf(tx, ty)
+        local s = shapeAt[k]
+        if s and s.art == "upright" and not s.authored then
+          local hits = 0
+          for dy = 0, 1 do
+            for dx = 0, 1 do
+              local t = tileAt[keyOf(tx + dx, ty + dy)]
+              if t and goldTreeTiles[t] then hits = hits + 1 end
+            end
+          end
+          if hits >= 2 then
+            for dy = 0, 1 do
+              for dx = 0, 1 do
+                local ck = keyOf(tx + dx, ty + dy)
+                local cs = shapeAt[ck]
+                if cs and not cs.authored then
+                  shapeAt[ck] = shapes.classes.cylinder
+                end
+              end
+            end
+          end
+        end
       end
     end
   end
@@ -253,7 +422,16 @@ function Structures.forMap(map)
   -- silently did nothing and the flights stayed painted on the floor.
   for cy = math.floor(y0 / 2), math.floor(y1 / 2) do
     for cx = math.floor(x0 / 2), math.floor(x1 / 2) do
-      if map.doorTiles[map:cellTile(cx, cy)] then
+      -- Gen 1: doorTiles is a set of tile ids. Gen 2 has no doorTiles (doors
+      -- are warp collision kinds); skip the fold rather than erroring.
+      local isDoor = false
+      if map.doorTiles then
+        isDoor = map.doorTiles[map:cellTile(cx, cy)] and true or false
+      elseif map.isDoorTileCell then
+        local ok, v = pcall(map.isDoorTileCell, map, cx, cy)
+        isDoor = ok and v or false
+      end
+      if isDoor then
         local northK = keyOf(cx * 2, cy * 2 - 1)
         local ns = shapeAt[northK]
         if ns and ns.art == "upright" then
@@ -715,6 +893,41 @@ local function roundTemplate(S, map, data, cx, cy, groundTiles, N, capRows,
   for i = 0, NX * NY - 1 do any = any or mask[i] end
   if not any then return {} end
 
+  -- Johto tree wall block $05 is two cells:
+  --   upper: $1E/$1F crown over $2E/$2F middle  (canopy)
+  --   lower: $2E/$2F middle AGAIN over $3E/$3F underside
+  -- Revolving the lower cell full-width duplicates the canopy and reads as
+  -- a flipped second ball under the first. Narrow every lower-band pixel
+  -- whose tile is middle or underside to a center trunk column so the
+  -- hull is canopy-on-trunk, not two stacked canopies.
+  if not (baseRows or wellRows) then
+    local mid = NX / 2
+    local half = 2  -- ~4px trunk diameter
+    local narrowed = false
+    for py = 0, NY - 1 do
+      for px = 0, NX - 1 do
+        local t = tileOf(px, py)
+        -- Tree-wall lower band (NY=32): middle+underside become trunk.
+        -- Lone tree (NY=16): only underside rows become trunk under crown.
+        local trunk = false
+        if t == 0x3E or t == 0x3F then
+          trunk = true
+        elseif (t == 0x2E or t == 0x2F) and NY > NX and py >= NX then
+          trunk = true
+        end
+        if trunk and math.abs(px + 0.5 - mid) > half then
+          mask[py * NX + px] = nil
+          narrowed = true
+        end
+      end
+    end
+    if narrowed then
+      any = nil
+      for i = 0, NX * NY - 1 do any = any or mask[i] end
+      if not any then return {} end
+    end
+  end
+
   -- a CAPPED hull (the stump): the top capRows rows of the mask are the
   -- drawn cut face -- a surface seen at an angle, not body. Strip them
   -- from the mask and remember their art span; the top-face quads below
@@ -928,7 +1141,8 @@ local function roundTemplate(S, map, data, cx, cy, groundTiles, N, capRows,
   -- bottom row's (outline-dark) pixels -- except where a stripped base row
   -- DREW something at that pixel, which keeps its own texel, so a can's
   -- drawn base rim lands on the model's base instead of being painted over
-  -- by the body band above it
+  -- by the body band above it.
+  --
   for iy = yBot + 1, NY - 1 do
     loRow[iy], hiRow[iy] = loRow[yBot], hiRow[yBot]
     for ix = loRow[yBot], hiRow[yBot] do
@@ -937,6 +1151,53 @@ local function roundTemplate(S, map, data, cx, cy, groundTiles, N, capRows,
         local i = iy * NX + ix
         z0[i], z1[i] = z0[b], z1[b]
         src[i] = (baseArt and baseArt[i]) and iy or yBot
+      end
+    end
+  end
+
+  -- Johto tree underside ($3E/$3F) is cast-shadow fringe, not a second
+  -- canopy. Revolving it at full width made the bottom half look like an
+  -- inverted tree top. When those tiles are in the canvas, force the
+  -- bottom band into a narrow trunk so the hull reads canopy-on-trunk.
+  if not (baseRows or wellRows or spray) then
+    local underFrom = nil
+    for py = 0, NY - 1 do
+      for px = 0, NX - 1 do
+        local t = tileOf(px, py)
+        if t == 0x3E or t == 0x3F then
+          underFrom = py
+          break
+        end
+      end
+      if underFrom then break end
+    end
+    if underFrom then
+      local trunkR = math.max(2, math.floor(NX / 8))
+      local mid = N2
+      for iy = underFrom, NY - 1 do
+        local lo = math.floor(mid - trunkR)
+        local hi = math.ceil(mid + trunkR) - 1
+        for ix = 0, NX - 1 do
+          local i = iy * NX + ix
+          if ix < lo or ix > hi then
+            z0[i], z1[i], z2[i], z3[i] = nil, nil, nil, nil
+          elseif not z0[i] then
+            -- solid trunk core where the fringe had no mask
+            z0[i] = math.floor(mid - trunkR)
+            z1[i] = math.ceil(mid + trunkR)
+            src[i] = iy
+          else
+            -- clamp existing chords to the trunk radius
+            local c0 = math.max(z0[i], math.floor(mid - trunkR))
+            local c1 = math.min(z1[i], math.ceil(mid + trunkR))
+            if c1 > c0 then
+              z0[i], z1[i] = c0, c1
+            else
+              z0[i], z1[i] = nil, nil
+            end
+          end
+        end
+        loRow[iy], hiRow[iy] = lo, hi
       end
     end
   end
@@ -1321,10 +1582,29 @@ function Structures.buildCylinders(S, map, x0, x1, y0, y1, groundTiles)
     = 6, 9, 4, 9, 5, 4
   -- the sapling class's depth, as a PERCENT of the revolved chord
   local saplingSquash = 50
+  -- Full revolve by default. A thin spray is ONLY applied when the profile
+  -- sets planter_spray = { rows=..., depth=... }. Trees and current pots
+  -- use planter_spray = false so crowns keep full depth; the old default
+  -- PLANTER_SPRAY capped every planter at 5 voxels and flattened Johto
+  -- tree tops/middles into cards.
+  local planterSpray = nil
   do
     local okP, prof = pcall(V.data, "voxel_heights")
-    local entry = okP and type(prof) == "table" and prof.tilesets
-                  and prof.tilesets[map.tileset.id]
+    local tilesets = okP and type(prof) == "table" and prof.tilesets
+    local tid = map.tileset and map.tileset.id
+    local entry = tilesets and tilesets[tid]
+    if not entry and type(tid) == "string" and tid:match("^TILESET_") then
+      local parts = {}
+      for part in tid:sub(9):gmatch("[^_]+") do
+        parts[#parts + 1] = part:sub(1, 1) .. part:sub(2):lower()
+      end
+      entry = tilesets and tilesets["Tileset" .. table.concat(parts)]
+    end
+    if entry and entry.planter_spray ~= nil then
+      local ps = entry.planter_spray
+      planterSpray = (type(ps) == "table" and (tonumber(ps.rows) or 0) > 0)
+                     and ps or nil
+    end
     if entry and type(entry.stump_cap) == "number" then
       stumpCap = entry.stump_cap
     end
@@ -1430,13 +1710,14 @@ function Structures.buildCylinders(S, map, x0, x1, y0, y1, groundTiles)
                 ids[#ids + 1] = S.tileAt[keyOf(cx * 2 + dx, cy * 2 + dy)]
               end
             end
-            local sig = tsid .. "|p32|" .. gsig .. "|"
+            local sprayTag = planterSpray and "spray" or "full"
+            local sig = tsid .. "|p32|" .. sprayTag .. "|" .. gsig .. "|"
                         .. table.concat(ids, ":")
             local tpl = roundCache[sig]
             if not tpl then
               local tq, tbg = roundTemplate(S, map, data, cx, cy,
                                             groundTiles, 16, nil, 32,
-                                            PLANTER_SPRAY)
+                                            planterSpray)
               tpl = { quads = tq, bg = tbg }
               roundCache[sig] = tpl
             end
