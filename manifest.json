@@ -1,7 +1,7 @@
 {
   "id": "DRAMATIC_SHAPE",
   "name": "Dramatic Shape Voxel Mod",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
