@@ -7254,6 +7254,21 @@ end)()
     .. "pillar, not hanging in the air two cells in front of it")
 end)()
 
+-- ------- persistent Android voxel BODY cache
+
+;(function()
+  local lib = run.loader.exports.DRAMATIC_SHAPE.lib
+  dofile(MOD_PATH .. "/tests/voxel_mesh_cache_test.lua")(
+    T,
+    lib.require("VoxelMeshCache"),
+    lib.require("ChunkMesher"),
+    lib.require("VoxelScene"),
+    lib.require("TerrainAtlas"),
+    lib.require("VoxelCacheScreen"),
+    lib.require("Structures"),
+    MOD_PATH)
+end)()
+
 Pipelines.reset()
 run.release()
 

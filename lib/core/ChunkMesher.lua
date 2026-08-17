@@ -56,11 +56,21 @@ local Buildings = V.require("Buildings")
 local TileShape = V.require("TileShape")
 local Voxel3D = V.require("Voxel3D")
 local Budget = V.require("BuildBudget")
+local MeshCache = V.require("VoxelMeshCache")
 
 local ffi = nil
 do
   local ok, mod = pcall(require, "ffi")
   if ok then ffi = mod end
+end
+
+-- love.system itself is sandboxed; current Gen1Recomp's compatibility facade
+-- answers getOS while older sandboxes raise. Fail closed on those older builds
+-- rather than changing desktop scheduling.
+local IS_ANDROID = false
+do
+  local ok, osName = pcall(function() return love.system.getOS() end)
+  IS_ANDROID = ok and osName == "Android"
 end
 
 local ChunkMesher = {}
@@ -203,7 +213,7 @@ local function newFfiSink()
       local ok, mesh = pcall(function()
         local m = love.graphics.newMesh(Voxel3D.FORMAT, n,
                                         "triangles", "static")
-        local CHUNK = 65536              -- vertices per slice (~1.5MB)
+        local CHUNK = IS_ANDROID and MeshCache.CHUNK_VERTICES or 65536
         local i = 0
         while i < n do
           local count = math.min(CHUNK, n - i)
@@ -229,6 +239,32 @@ local function newSink()
     return newFfiSink()
   end
   return newTableSink()
+end
+
+local function persistentCapable()
+  return MeshCache.available() and love and love.data
+         and love.data.newByteData and love.graphics
+         and love.graphics.newMesh
+end
+
+-- MeshCache hands back the exact interleaved six-float bytes expected by
+-- Voxel3D.FORMAT. ByteData can be uploaded directly: no FFI pointer or copy is
+-- needed, which is what keeps this path valid in the current mod sandbox.
+local function cachedMeshReceiver(_, count)
+  local mesh = love.graphics.newMesh(Voxel3D.FORMAT, count,
+                                     "triangles", "static")
+  return {
+    write = function(self, raw, first)
+      local data = love.data.newByteData(raw)
+      mesh:setVertices(data, first + 1)
+      if data.release then data:release() end
+    end,
+    finish = function() return mesh end,
+    abort = function()
+      if mesh and mesh.release then pcall(mesh.release, mesh) end
+      mesh = nil
+    end,
+  }
 end
 
 -- -------------------------------------------------------------- geometry
@@ -914,6 +950,42 @@ function ChunkMesher.build(map, bodyOnly, masks, split)
   return sink.finish(), waterSink and waterSink.finish() or nil
 end
 
+function ChunkMesher.persistentCacheAvailable()
+  return persistentCapable() and true or false
+end
+
+function ChunkMesher.bodyCachedOnDisk(map)
+  if not persistentCapable() then return false end
+  local hit = MeshCache.status(map)
+  return hit and true or false
+end
+
+-- Generate BODY directly into bounded persistent chunks. Unlike V19's raw
+-- sink, this does not retain the whole map in an FFI buffer: each terrain or
+-- water chunk is packed, optionally LZ4-compressed and committed independently.
+function ChunkMesher.precompileBody(map)
+  if not (persistentCapable() and map) then return false, "unsupported" end
+  if ChunkMesher.bodyCachedOnDisk(map) then return true, "cached" end
+  local store, reason = MeshCache.beginStore(map)
+  if not store then return false, reason end
+  local ok, err = pcall(runGeometry, map, true, nil,
+                        store:sink("body"), store:sink("water"))
+  if not ok then
+    store:abort()
+    return false, tostring(err)
+  end
+  local stored, storeReason = store:commit()
+  return stored, stored and "built" or storeReason
+end
+
+function ChunkMesher.persistentCacheVersion()
+  return MeshCache.SCHEMA_VERSION, MeshCache.GEOMETRY_VERSION
+end
+
+function ChunkMesher.persistentCacheDirectory()
+  return MeshCache.DIRECTORY
+end
+
 local function quadsMesh(quads, grass)
   if #quads == 0 then return nil end
   local verts, indices, n = {}, {}, 0
@@ -1072,6 +1144,63 @@ end
 local function runJob(job)
   local map = job.map
   local c = entry(job.id)
+
+  -- BODY jobs prefer the persistent stream. A corrupt/truncated entry is
+  -- rejected by MeshCache, its ready marker is removed, and this job becomes
+  -- ordinary cold work before it can continue.
+  local mesh, water = nil, nil
+  local loaded = false
+  local attemptedPersistent = job.slot == "body"
+      and job.allowPersistent ~= false and job.persistent
+  if attemptedPersistent then
+    loaded, mesh, water = MeshCache.load(map, cachedMeshReceiver)
+    if not loaded then job.persistent = false end
+  end
+  -- Do not turn a cached-neighbour upload that proved corrupt into a large
+  -- live generation in the same walking frame.
+  if not loaded and attemptedPersistent and job.moving and not job.urgent then
+    coroutine.yield("cache-miss")
+  end
+
+  -- A cache miss on Android also generates through the bounded persistent
+  -- sinks. This replaces V19's FFI staging buffer (FFI is no longer exposed
+  -- to content mods): geometry is written in 4K-vertex chunks, then streamed
+  -- into the GPU by the same checked load path. Stale runtime edits never take
+  -- this route, because persisting a Cut/door state globally would be wrong.
+  if not loaded and job.slot == "body" and job.allowPersistent ~= false
+     and persistentCapable() then
+    local stored = ChunkMesher.precompileBody(map)
+    if stored then
+      loaded, mesh, water = MeshCache.load(map, cachedMeshReceiver)
+    end
+  end
+
+  if not loaded then
+    local sink, waterSink = newSink(), newSink()
+    runGeometry(map, job.slot == "body", job.masks, sink, waterSink)
+    mesh, water = sink.finish(), waterSink.finish()
+  end
+
+  if (gen[job.id] or 0) ~= job.gen then
+    if mesh and mesh.release then pcall(mesh.release, mesh) end
+    if water and water.release then pcall(water.release, water) end
+    return
+  end
+  swapSlot(c, job.slot, mesh or false)
+  swapSlot(c, waterSlot(job.slot), water or false)
+  if c.stale then c.stale[job.slot] = nil end
+
+  -- Terrain becomes drawable before optional grass/flower/figure work. Keep
+  -- the existing v1.8.4 auxiliary behavior, but resume it only in idle or
+  -- covered time so a cheap persistent BODY cannot drag a Structures build
+  -- into the same walking frame.
+  if not job.covered then
+    job.terrainReady = true
+    job.urgent = false
+    job.warm = 0
+    coroutine.yield("terrain-ready")
+  end
+
   if c.grass == nil or c.flowers == nil or c.figures == nil
      or (c.stale and c.stale.aux) then
     local okG, grass = pcall(buildGrassMesh, map)
@@ -1091,23 +1220,8 @@ local function runJob(job)
     c.figures = (okX and figures) or false
     if c.stale then c.stale.aux = nil end
   end
-  local sink = newSink()
-  local waterSink = newSink()
-  runGeometry(map, job.slot == "body", job.masks, sink, waterSink)
-  local mesh = sink.finish()
-  local water = waterSink.finish()
-  if (gen[job.id] or 0) ~= job.gen then
-    if mesh and mesh.release then pcall(mesh.release, mesh) end
-    if water and water.release then pcall(water.release, water) end
-    return
-  end
-  swapSlot(c, job.slot, mesh or false)
-  swapSlot(c, waterSlot(job.slot), water or false)
-  if c.stale then
-    c.stale[job.slot] = nil
-    if not (c.stale.full or c.stale.body or c.stale.aux) then
-      c.stale = nil
-    end
+  if c.stale and not (c.stale.full or c.stale.body or c.stale.aux) then
+    c.stale = nil
   end
 end
 
@@ -1118,20 +1232,31 @@ end
 -- stale queues its rebuild AND keeps handing back the old mesh, so a
 -- one-block edit never drops the scene to the flat 2D path while the
 -- replacement cooks.
-function ChunkMesher.request(map, bodyOnly, masks, urgent)
+function ChunkMesher.request(map, bodyOnly, masks, urgent, warm)
   local slot = bodyOnly and "body" or "full"
   local c = cache[map.id]
   local stale = c and c.stale and (c.stale[slot] or c.stale.aux)
   if c and c[slot] ~= nil and not stale then return c[slot] or nil end
+
+  local persistent = bodyOnly and not stale and ChunkMesher.bodyCachedOnDisk(map)
+                     or false
   local key = jobKey(map.id, slot)
   local job = jobIndex[key]
   if not job then
     job = { id = map.id, map = map, slot = slot, masks = masks,
-            urgent = urgent or false, gen = gen[map.id] or 0 }
+            urgent = urgent or false, warm = warm or 0,
+            persistent = persistent,
+            allowPersistent = bodyOnly and not stale,
+            gen = gen[map.id] or 0 }
     jobIndex[key] = job
     jobs[#jobs + 1] = job
-  elseif urgent then
-    job.urgent = true
+  else
+    job.persistent = persistent
+    if stale then job.allowPersistent = false end
+    -- Priorities are live: turning away from a connection or making BODY
+    -- drawable must demote an already queued job.
+    if urgent ~= nil then job.urgent = urgent and true or false end
+    if warm ~= nil then job.warm = warm or 0 end
   end
   return (c and c[slot]) or nil
 end
@@ -1140,33 +1265,79 @@ function ChunkMesher.pending()
   return #jobs
 end
 
+function ChunkMesher.failed(map, bodyOnly)
+  local c = map and cache[map.id] or nil
+  return c and c[bodyOnly and "body" or "full"] == false or false
+end
+
 -- Advance queued builds inside a per-frame time budget. Urgent jobs (the
 -- current map) come first and get the larger slice -- the first voxel
 -- frame after a toggle is worth more milliseconds than a neighbour
 -- popping in one frame later. `covered` says the world pass is hidden
 -- this frame (a warp's fade, a menu): nothing visible can hitch, so the
 -- slice opens up and a door fade swallows most of a destination build.
-local URGENT_SLICE = 0.012
-local IDLE_SLICE = 0.005
-local COVERED_SLICE = 0.030
+local URGENT_SLICE = IS_ANDROID and 0.0020 or 0.012
+local IDLE_SLICE = IS_ANDROID and 0.0008 or 0.005
+local MOVING_URGENT_SLICE = IS_ANDROID and 0.0009 or URGENT_SLICE
+local MOVING_CACHE_SLICE = IS_ANDROID and 0.0006 or IDLE_SLICE
+local IDLE_CACHE_SLICE = IS_ANDROID and 0.0030 or IDLE_SLICE
+local COVERED_CACHE_SLICE = 0.030
+local COVERED_HEAVY_SLICE = IS_ANDROID and 0.0080 or 0.030
 
-function ChunkMesher.pump(covered)
-  if #jobs == 0 then return end
-  local pick = jobs[1]
-  for _, j in ipairs(jobs) do
-    if j.urgent then
-      pick = j
-      break
+local function chooseJob(moving)
+  if #jobs == 0 then return nil, false, false end
+  local warmPick, warmValue = nil, -math.huge
+  for _, job in ipairs(jobs) do
+    if job.urgent and not job.terrainReady then return job, true, false end
+    -- During Android movement a cold warm job cannot run. Do not let it hide
+    -- a lower-priority persistent neighbour that can make cheap progress.
+    if not (IS_ANDROID and moving) or job.persistent then
+      local value = job.warm or 0
+      if not job.terrainReady and value > warmValue then
+        warmPick, warmValue = job, value
+      end
     end
   end
-  local slice = covered and COVERED_SLICE
-                or (pick.urgent and URGENT_SLICE or IDLE_SLICE)
+  if warmPick and warmValue > 0 then return warmPick, false, true end
+  return jobs[1], false, false
+end
+
+local function walkingAllows(job, urgentPick, warmPick, android)
+  if not android then return true end
+  if job.terrainReady then return false end
+  return urgentPick or (warmPick and job.persistent) or false
+end
+
+function ChunkMesher.pump(covered, moving)
+  if #jobs == 0 then return end
+  local pick, urgentPick, warmPick = chooseJob(moving)
+  if not pick then return end
+  if moving and not covered
+     and not walkingAllows(pick, urgentPick, warmPick, IS_ANDROID) then
+    return
+  end
+
+  local slice
+  if covered then
+    slice = pick.persistent and COVERED_CACHE_SLICE or COVERED_HEAVY_SLICE
+  elseif moving then
+    slice = pick.persistent and MOVING_CACHE_SLICE
+            or (urgentPick and MOVING_URGENT_SLICE or 0)
+  elseif pick.persistent then
+    slice = IDLE_CACHE_SLICE
+  else
+    slice = urgentPick and URGENT_SLICE or IDLE_SLICE
+  end
+  if slice <= 0 then return end
+
   local deadline = clock() + slice
   while pick do
     if not pick.co then
       pick.co = coroutine.create(runJob)
     end
-    Budget.begin(pick.co, deadline - clock())
+    pick.covered = covered and true or false
+    pick.moving = moving and not covered
+    Budget.begin(pick.co, math.max(0, deadline - clock()))
     local ok, err = coroutine.resume(pick.co, pick)
     Budget.finish()
     if not ok then
@@ -1177,15 +1348,20 @@ function ChunkMesher.pump(covered)
       return   -- slice spent mid-build; resume next frame
     end
     if clock() >= deadline or #jobs == 0 then return end
-    pick = jobs[1]
-    for _, j in ipairs(jobs) do
-      if j.urgent then
-        pick = j
-        break
-      end
+    pick, urgentPick, warmPick = chooseJob(moving)
+    if not pick then return end
+    if moving and not covered
+       and not walkingAllows(pick, urgentPick, warmPick, IS_ANDROID) then
+      return
     end
   end
 end
+
+ChunkMesher._test = {
+  walkingAllows = function(job, urgentPick, warmPick)
+    return walkingAllows(job, urgentPick, warmPick, true)
+  end,
+}
 
 -- Meshes for `map`, built SYNCHRONOUSLY on first use -- the historical
 -- contract, kept for probes and any direct caller. `false` is cached for
@@ -1284,6 +1460,11 @@ function ChunkMesher.refresh(mapId)
     return ChunkMesher.invalidate(mapId)
   end
   Structures.invalidate(mapId)
+  -- Runtime block edits also invalidate the memoized persistent fingerprint.
+  -- The on-disk entry itself is retained: status() will reject it if the
+  -- rebuilt map/layout fingerprint differs, and can reuse it if an edit was
+  -- subsequently reverted before the next load.
+  MeshCache.forget(mapId)
   gen[mapId] = (gen[mapId] or 0) + 1
   for i = #jobs, 1, -1 do
     local job = jobs[i]
@@ -1319,6 +1500,7 @@ function ChunkMesher.setLive(live)
       cache[id] = nil
       gen[id] = (gen[id] or 0) + 1
       Structures.invalidate(id)
+      MeshCache.forget(id)
     end
   end
   for i = #jobs, 1, -1 do
@@ -1337,6 +1519,7 @@ end
 -- the generation counter.
 function ChunkMesher.invalidate(mapId)
   Structures.invalidate(mapId)
+  MeshCache.forget(mapId)
   if mapId then
     local c = cache[mapId]
     if c then releaseEntry(c) end

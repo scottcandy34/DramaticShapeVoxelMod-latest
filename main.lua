@@ -83,6 +83,7 @@ local Voxel3D = V.require("Voxel3D")
 local VoxelScene = V.require("VoxelScene")
 local TiltShift = V.require("TiltShift")
 local ChunkMesher = V.require("ChunkMesher")
+local VoxelCacheScreen = V.require("VoxelCacheScreen")
 local VoxelGrid = V.require("VoxelGrid")
 local WorldCurve = V.require("WorldCurve")
 local ViewBox = V.require("ViewBox")
@@ -180,6 +181,36 @@ local function sceneSize(ctx)
 end
 
 local voidFill = { last = nil }
+
+-- At high refresh rates, a grid step can contain brief frames where the
+-- engine's moving flag is down. Keep a small grace window so Android never
+-- mistakes those gaps for permission to start a cold neighbour build.
+local IS_ANDROID = false
+pcall(function()
+  IS_ANDROID = love and love.system and love.system.getOS
+               and love.system.getOS() == "Android"
+end)
+local moveProbe = { map = nil, x = nil, y = nil, last = -math.huge }
+local moveClock = (love and love.timer and love.timer.getTime) or os.clock
+local MOVE_GRACE = 0.18
+
+local function overworldMoving(ow)
+  if not IS_ANDROID then return false end
+  local player = ow and ow.player
+  if not (player and ow.map) then
+    moveProbe.map, moveProbe.x, moveProbe.y = nil, nil, nil
+    moveProbe.last = -math.huge
+    return false
+  end
+  local sameMap = moveProbe.map == ow.map.id
+  local moved = sameMap and moveProbe.x ~= nil
+                and (player.px ~= moveProbe.x or player.py ~= moveProbe.y)
+  local active = player.moving == true or moved
+  if active then moveProbe.last = moveClock() end
+  moveProbe.map, moveProbe.x, moveProbe.y = ow.map.id, player.px, player.py
+  return active or (sameMap and moveClock() - moveProbe.last < MOVE_GRACE)
+end
+
 function voidFill.check()
   local TileRenderer = require("src.render.TileRenderer")
   local now = TileRenderer.voidFill
@@ -323,14 +354,21 @@ mod.content.render_pipelines:register("voxel", {
     -- Ahead of the active() gate: with the mode off, the headset still
     -- shows the flat screen on the floating panel.
     VR.update(dt)
+    -- Android prepares large BODY meshes once on an opaque, resumable screen.
+    -- Completion lives in persistent storage, so subsequent launches and
+    -- ordinary traversal only stream bounded cache chunks. Keep this after
+    -- the always-running modes above so the new screen does not pause them.
+    pcall(VoxelCacheScreen.maybePush)
+    if VoxelCacheScreen.active() then return end
     if not Voxel.active() then return end
     local Game = require("src.core.Game")
     local ow = Game and Game.overworld
+    local covered = ((Game and Game.stack and Game.stack:top() ~= ow)
+                     or (ow and ow.transitioning)) and true or false
     if ow and ow.map and ow.camera then
-      pcall(VoxelScene.prefetch, ow)
+      pcall(VoxelScene.prefetch, ow, covered)
     end
-    ChunkMesher.pump(Game and Game.stack
-                     and Game.stack:top() ~= ow)
+    ChunkMesher.pump(covered, not covered and overworldMoving(ow))
   end,
 
   drawWorld = function(ctx)
@@ -365,7 +403,7 @@ mod.content.render_pipelines:register("voxel", {
     -- gen2-gold-beta meshKick diagnostics: once per session, name the map
     -- and force a short pump so a stuck empty cache surfaces as a real
     -- build failure rather than an endless silent 2D fallback.
-    if st and st.map and not V._meshKick then
+    if st and st.map and not V._meshKick and not VoxelCacheScreen.active() then
       V._meshKick = true
       local map = st.map
       local ts = map.tileset
@@ -379,10 +417,17 @@ mod.content.render_pipelines:register("voxel", {
       local okB, errB = pcall(function()
         ChunkMesher.request(map, true, {}, true)
         ChunkMesher.request(map, false, {}, true)
-        for _ = 1, 30 do
-          ChunkMesher.pump(true)
-          if ChunkMesher.pair(map, true) or ChunkMesher.pair(map, false) then
-            break
+        if ChunkMesher.persistentCacheAvailable() then
+          -- A single ordinary-frame slice is enough to diagnose the Android
+          -- path without reinstating the old 30-slice visible-frame stall.
+          ChunkMesher.pump(false, false)
+        else
+          -- Keep the maintained release's diagnostic behaviour on desktop.
+          for _ = 1, 30 do
+            ChunkMesher.pump(true, false)
+            if ChunkMesher.pair(map, true) or ChunkMesher.pair(map, false) then
+              break
+            end
           end
         end
       end)
