@@ -476,14 +476,79 @@ function VoxelScene.prefetch(state)
   -- cut out of that build's own geometry (ChunkMesher.pair), so the two
   -- always come from the same slot and a lake is never drawn twice or left
   -- as a hole.
-  ChunkMesher.request(state.map, false, masks, true)
   local terrain, water = ChunkMesher.pair(state.map, false)
   if not terrain then
     terrain, water = ChunkMesher.pair(state.map, true)
   end
+  if not terrain then
+    -- BODY is enough to leave the flat fallback and is the slot persisted by
+    -- the Android warm-up. Queue it before FULL; a corrupt/missing entry stays
+    -- on the ordinary asynchronous path rather than blocking a transition.
+    ChunkMesher.request(state.map, true, nil, true)
+    ChunkMesher.request(state.map, false, masks,
+                        ChunkMesher.failed(state.map, true))
+  else
+    -- Once terrain is drawable, the border-ring refinement is background work
+    -- and must not steal normal walking frames.
+    ChunkMesher.request(state.map, false, masks, false)
+  end
+
   local nbMesh, nbWater = {}, {}
+  local nearest, nearestD2 = nil, math.huge
+  local front, frontScore = nil, -math.huge
+  local player = state.player
+  local facing = player and player.facing or nil
+  local fx, fy = 0, 0
+  if facing == "up" then fy = -1
+  elseif facing == "down" then fy = 1
+  elseif facing == "left" then fx = -1
+  elseif facing == "right" then fx = 1 end
+
+  if player then
+    local currentW = (state.map.def.width or 0) * 32
+    local currentH = (state.map.def.height or 0) * 32
+    local currentCx, currentCy = currentW * 0.5, currentH * 0.5
+    for i, nb in ipairs(state.neighbors or {}) do
+      local x1, y1 = nb.ox, nb.oy
+      local x2 = x1 + nb.map.def.width * 32
+      local y2 = y1 + nb.map.def.height * 32
+      local dx = (player.px < x1 and x1 - player.px)
+                 or (player.px > x2 and player.px - x2) or 0
+      local dy = (player.py < y1 and y1 - player.py)
+                 or (player.py > y2 and player.py - y2) or 0
+      local d2 = dx * dx + dy * dy
+      if d2 < nearestD2 then nearest, nearestD2 = i, d2 end
+
+      if fx ~= 0 or fy ~= 0 then
+        local nx = nb.ox + nb.map.def.width * 16 - currentCx
+        local ny = nb.oy + nb.map.def.height * 16 - currentCy
+        local len = math.sqrt(nx * nx + ny * ny)
+        if len > 0 then
+          local score = (nx * fx + ny * fy) / len
+          if score > frontScore then front, frontScore = i, score end
+        end
+      end
+    end
+  end
+
   for i, nb in ipairs(state.neighbors or {}) do
-    ChunkMesher.request(nb.map, true)
+    -- Every direct neighbour gets an immediate persistent-cache request.
+    -- Facing priority brings the likely border in first. A cache miss can be
+    -- queued, but the mesher scheduler will not cold-generate it while walking.
+    local cached = ChunkMesher.bodyCachedOnDisk(nb.map)
+    local warm = 0
+    if cached then
+      if i == front and frontScore > 0.20 then
+        warm = 6
+      elseif i == nearest then
+        warm = 4
+      else
+        warm = 2
+      end
+    elseif i == nearest and nearestD2 <= 32 * 32 then
+      warm = 2
+    end
+    ChunkMesher.request(nb.map, true, nil, false, warm)
     nbMesh[i], nbWater[i] = ChunkMesher.pair(nb.map, true)
     if not nbMesh[i] then
       nbMesh[i], nbWater[i] = ChunkMesher.pair(nb.map, false)
