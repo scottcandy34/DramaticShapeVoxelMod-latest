@@ -50,8 +50,8 @@ return function(game)
 
   -- decompose the retained Lua heap: drop the mod's caches one at a time
   -- and re-collect, so each pool's share is named
-  local ChunkMesher = V.require("ChunkMesher")
-  local Structures = V.require("Structures")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Structures = V.require("voxel/Structures")
   collectgarbage("collect")
   local before = collectgarbage("count")
   ChunkMesher.invalidate()       -- drops mesh cache AND Structures cache

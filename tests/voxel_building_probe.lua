@@ -32,8 +32,8 @@ return function(game)
 
   local V = game.mods.exports["DRAMATIC_SHAPE"]
   V = V and V.lib
-  local Structures = V and V.require("Structures")
-  local Buildings = V and V.require("Buildings")
+  local Structures = V and V.require("voxel/Structures")
+  local Buildings = V and V.require("voxel/Buildings")
   local ow = game.overworld
   if not (Structures and Buildings and ow and ow.map) then
     print("[bld] mod or map unavailable")

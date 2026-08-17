@@ -38,9 +38,9 @@ return function(game)
 
   local handle = game.mods.exports["DRAMATIC_SHAPE"]
   local V = assert(handle and handle.lib, "DRAMATIC_SHAPE exports missing")
-  local ShadowMap = V.require("ShadowMap")
-  local Voxel3D = V.require("Voxel3D")
-  local Mat4 = V.require("Mat4")
+  local ShadowMap = V.require("effects/ShadowMap")
+  local Voxel3D = V.require("voxel/Voxel3D")
+  local Mat4 = V.require("util/Mat4")
 
   local levels = {}
   for n in (os.getenv("ACNE_LEVELS") or "3"):gmatch("%d+") do
@@ -121,7 +121,7 @@ return function(game)
   -- on/off), so a band can be attributed to one of them rather than
   -- guessed at. The grid is the other thing in this pass that draws
   -- regular lines, and at a grazing angle it moires.
-  local VoxelGrid = V.require("VoxelGrid")
+  local VoxelGrid = V.require("voxel/VoxelGrid")
   local matrix = os.getenv("ACNE_MATRIX") == "1"
 
   local function shoot(name)

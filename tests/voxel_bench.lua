@@ -51,17 +51,17 @@ return function(game)
     return
   end
   local V = handle.lib
-  local Perf = V.require("Perf")
+  local Perf = V.require("util/Perf")
   if not Perf.enabled then
     print("[bench] DS_PERF is not set -- run with DS_PERF=1 or this measures nothing")
     return
   end
   local loadBytes = V.loadBytes
-  local Structures = V.require("Structures")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Buildings = V.require("Buildings")
-  local DayNight = V.require("DayNight")
-  local VoxelScene = V.require("VoxelScene")
+  local Structures = V.require("voxel/Structures")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Buildings = V.require("voxel/Buildings")
+  local DayNight = V.require("effects/DayNight")
+  local VoxelScene = V.require("voxel/VoxelScene")
 
   -- module internals worth naming that the mod does not time itself
   Perf.wrap(Structures, "forMap", "Structures.forMap")
@@ -156,7 +156,7 @@ return function(game)
   for _, rung in ipairs({ 2, 3, 4, 5 }) do   -- 15, 35, 50, 75 degrees
     Pipelines.setLevel("voxel", rung)
     settle(60)                                -- let the tween finish
-    seg("pitch:" .. tostring(V.require("VoxelState").ANGLE_LABELS[rung + 1]))
+    seg("pitch:" .. tostring(V.require("voxel/VoxelState").ANGLE_LABELS[rung + 1]))
     U.wait(180)
     Perf.setSegment(nil)
   end

@@ -25,10 +25,10 @@ return function(game)
     return
   end
   local V = handle.lib
-  local DayNight = V.require("DayNight")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
-  local TileShape = V.require("TileShape")
+  local DayNight = V.require("effects/DayNight")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
+  local TileShape = V.require("voxel/TileShape")
 
   -- prove the game is reading THIS tree, not a stale installed copy
   local ht = TileShape.wallTop and TileShape.wallTop("HOUSE")

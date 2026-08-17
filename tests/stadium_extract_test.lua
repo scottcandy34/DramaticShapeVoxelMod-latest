@@ -55,8 +55,8 @@ V.mod = { log = { warn = function() end, info = function() end } }
 -- relative to the MOD rather than to wherever this was run from
 V.path = MOD
 
-local StadiumRom = V.require("StadiumRom")
-local StadiumBuild = V.require("StadiumBuild")
+local StadiumRom = V.require("stadium/rom/StadiumRom")
+local StadiumBuild = V.require("stadium/rom/StadiumBuild")
 
 -- ------- run
 

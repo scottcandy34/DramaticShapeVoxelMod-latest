@@ -26,7 +26,7 @@
 local V = ...
 
 local Assets = require("src.render.Assets")
-local Voxel3D = V.require("Voxel3D")
+local Voxel3D = V.require("voxel/Voxel3D")
 
 local SpriteBillboards = {}
 

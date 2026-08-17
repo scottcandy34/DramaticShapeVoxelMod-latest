@@ -16,11 +16,11 @@ return function(game)
     return
   end
   local V = handle.lib
-  local DayNight = V.require("DayNight")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
-  local WorldCurve = V.require("WorldCurve")
-  local Water = V.require("Water")
+  local DayNight = V.require("effects/dayNight")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
+  local WorldCurve = V.require("effects/WorldCurve")
+  local Water = V.require("effects/Water")
   -- WATER_RUNG=sky drops the screen-space march and leaves the sky path, to
   -- tell an artefact of the one from an artefact of the other
   if os.getenv("WATER_RUNG") then Water.setting:sync(os.getenv("WATER_RUNG")) end
@@ -55,7 +55,7 @@ return function(game)
   -- Stand on the walkable cell just north of the widest run of water on the
   -- map, so a scene is picked by where the water actually is rather than by
   -- a coordinate guessed off the block list.
-  local TileShape = V.require("TileShape")
+  local TileShape = V.require("voxel/TileShape")
   local function shore(map)
     local def = map.def
     local shapes = TileShape.forMap(map)

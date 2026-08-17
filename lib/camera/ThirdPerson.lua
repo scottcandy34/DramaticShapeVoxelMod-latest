@@ -38,7 +38,7 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Voxel = V.require("VoxelState")
+local Voxel = V.require("voxel/VoxelState")
 
 local ThirdPerson = {}
 
@@ -160,7 +160,7 @@ end
 -- Required lazily and guarded: VR reaches this module through FirstPerson,
 -- and a headless run has no VR module worth loading at all.
 local function headset()
-  local ok, on = pcall(function() return V.require("VR").active() end)
+  local ok, on = pcall(function() return V.require("vr/VR").active() end)
   return ok and on or false
 end
 
@@ -248,7 +248,7 @@ end
 local function occupied(ow, wx, y, wz)
   local map, cx, cy = cellAt(ow, wx, wz)
   if not map then return true end
-  local VoxelScene = V.require("VoxelScene")
+  local VoxelScene = V.require("voxel/VoxelScene")
   local okG, gh = pcall(VoxelScene.groundAt, map, cx, cy)
   gh = (okG and gh) or 0
   if y < gh + ThirdPerson.PAD then return true end

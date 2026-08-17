@@ -38,8 +38,8 @@ end
 -- not, so the require is stubbed out to the one field it reads.
 modules.Voxel3D = { FORMAT = {} }
 
-local Pack = V.require("StadiumPack")
-local Rig = V.require("StadiumRig")
+local Pack = V.require("stadium/rom/StadiumPack")
+local Rig = V.require("stadium/mon/StadiumRig")
 
 local want = {}
 for i = 1, #arg do want[#want + 1] = tonumber(arg[i]) end

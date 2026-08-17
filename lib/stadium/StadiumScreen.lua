@@ -30,7 +30,7 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local StadiumInstall = V.require("StadiumInstall")
+local StadiumInstall = V.require("stadium/rom/StadiumInstall")
 
 local StadiumScreen = {}
 StadiumScreen.__index = StadiumScreen

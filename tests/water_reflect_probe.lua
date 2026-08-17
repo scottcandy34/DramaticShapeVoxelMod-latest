@@ -34,11 +34,11 @@ return function(game)
   V = V and V.lib
   if not V then return say("mod exports unreachable -- is it enabled?") end
 
-  local Water = V.require("Water")
-  local Voxel3D = V.require("Voxel3D")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Sky = V.require("Sky")
-  local DayNight = V.require("DayNight")
+  local Water = V.require("effects/Water")
+  local Voxel3D = V.require("voxel/Voxel3D")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Sky = V.require("effects/Sky")
+  local DayNight = V.require("effects/DayNight")
 
   if os.getenv("REFL_TIME") then
     DayNight.setting:sync(os.getenv("REFL_TIME"))

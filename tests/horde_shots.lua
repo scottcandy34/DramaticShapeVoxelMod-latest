@@ -22,12 +22,12 @@ return function(game)
     return love.event.quit()
   end
   local V = handle.lib
-  local Horde = V.require("Horde")
-  local Mobs = V.require("HordeMobs")
-  local Gun = V.require("HordeGun")
-  local FirstPerson = V.require("FirstPerson")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
+  local Horde = V.require("modes/horde/Horde")
+  local Mobs = V.require("modes/horde/HordeMobs")
+  local Gun = V.require("modes/horde/HordeGun")
+  local FirstPerson = V.require("camera/FirstPerson")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
 
   pcall(os.execute, 'mkdir -p "' .. ROOT .. '" 2>/dev/null')
   pcall(os.execute, 'mkdir "' .. ROOT:gsub("/", "\\") .. '" 2>nul')

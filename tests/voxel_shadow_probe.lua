@@ -30,9 +30,9 @@ return function(game)
   local handle = game.mods.exports["DRAMATIC_SHAPE"]
   local V = handle and handle.lib
   assert(V, "DRAMATIC_SHAPE exports not reachable")
-  local ShadowMap = V.require("ShadowMap")
-  local Voxel3D = V.require("Voxel3D")
-  local VoxelGrid = V.require("VoxelGrid")
+  local ShadowMap = V.require("effects/ShadowMap")
+  local Voxel3D = V.require("voxel/Voxel3D")
+  local VoxelGrid = V.require("voxel/VoxelGrid")
 
   -- SHADOW_GRID=1 forces the voxel wireframe on for the run, and
   -- SHADOW_CURVE=n the curved-world rung -- neither touches the player's
@@ -42,7 +42,7 @@ return function(game)
     print("[shadow] voxel grid forced on; shader built="
           .. tostring(Voxel3D.shader(true) ~= nil))
   end
-  local WorldCurve = V.require("WorldCurve")
+  local WorldCurve = V.require("effects/WorldCurve")
   local curve = math.floor(tonumber(os.getenv("SHADOW_CURVE")) or 0)
   if curve > 0 then
     WorldCurve.sync(curve)

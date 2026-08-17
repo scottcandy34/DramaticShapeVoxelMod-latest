@@ -50,11 +50,11 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Mat4 = V.require("Mat4")
-local Voxel = V.require("VoxelState")
-local Voxel3D = V.require("Voxel3D")
-local WorldCurve = V.require("WorldCurve")
-local ThirdPerson = V.require("ThirdPerson")
+local Mat4 = V.require("util/Mat4")
+local Voxel = V.require("voxel/VoxelState")
+local Voxel3D = V.require("voxel/Voxel3D")
+local WorldCurve = V.require("effects/WorldCurve")
+local ThirdPerson = V.require("camera/ThirdPerson")
 
 local FirstPerson = {}
 
@@ -653,7 +653,7 @@ function FirstPerson.shadowCenter(sx, sy, vh)
   local e = FirstPerson.cardBlend()
   if e <= 0 then return sx, sy end
   local fx, fz = FirstPerson.lookFlat()
-  local ShadowMap = V.require("ShadowMap")
+  local ShadowMap = V.require("effects/ShadowMap")
   local cap = (ShadowMap.FAR_CAP or 2.5) * vh
   return sx + fx * 0.6 * vh * e,
          sy + fz * (fz > 0 and (cap - vh * 0.5) or vh * 0.4) * e
@@ -774,13 +774,13 @@ function FirstPerson.install()
   local mouseHeld = {}
   local MOUSE_BTN = { [1] = "a", [2] = "b" }
   local function hordeMouse(button, down)
-    local Horde = V.require("Horde")
+    local Horde = V.require("modes/horde/Horde")
     if not Horde.playing() then return false end
     if button == 1 then
-      if down then V.require("HordeGun").fire() end
+      if down then V.require("modes/horde/HordeGun").fire() end
       return true
     elseif button == 2 then
-      V.require("HordeGun").setAds(down)
+      V.require("modes/horde/HordeGun").setAds(down)
       return true
     end
     return false
@@ -848,8 +848,8 @@ function FirstPerson.install()
           -- a shooter that waits to find out whether you meant it is a
           -- shooter that misses. The same finger still becomes the look
           -- drag below, so aiming and firing are one gesture.
-          if V.require("Horde").playing() then
-            V.require("HordeGun").fire()
+          if V.require("modes/horde/Horde").playing() then
+            V.require("modes/horde/HordeGun").fire()
           end
           lookTouch = { id = id, x = x, y = y }
           return

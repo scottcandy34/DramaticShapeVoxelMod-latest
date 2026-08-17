@@ -32,16 +32,16 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Mat4 = V.require("Mat4")
-local Voxel3D = V.require("Voxel3D")
-local ShadowMap = V.require("ShadowMap")
-local ChunkMesher = V.require("ChunkMesher")
-local TerrainAtlas = V.require("TerrainAtlas")
-local VoxelScene = V.require("VoxelScene")
-local BattleCam = V.require("BattleCam")
-local BattleBillboard = V.require("BattleBillboard")
-local DayNight = V.require("DayNight")
-local AntiAlias = V.require("AntiAlias")
+local Mat4 = V.require("util/Mat4")
+local Voxel3D = V.require("voxel/Voxel3D")
+local ShadowMap = V.require("effects/ShadowMap")
+local ChunkMesher = V.require("voxel/ChunkMesher")
+local TerrainAtlas = V.require("voxel/TerrainAtlas")
+local VoxelScene = V.require("voxel/VoxelScene")
+local BattleCam = V.require("battle/BattleCam")
+local BattleBillboard = V.require("battle/BattleBillboard")
+local DayNight = V.require("effects/DayNight")
+local AntiAlias = V.require("effects/AntiAlias")
 local PaletteFX = require("src.render.PaletteFX")
 local Map = require("src.world.Map")
 
@@ -375,10 +375,10 @@ local function castShadows(state, arena, terrain, nbMesh, cx, cy, vw, vh,
   -- below this is a map that is not in the shot.
   if arena.discs then
     pcall(function()
-      V.require("StadiumStage").cast(ShadowMap, arena, groundY or 0)
+      V.require("stadium/StadiumStage").cast(ShadowMap, arena, groundY or 0)
     end)
     if not externalActors then
-      pcall(function() V.require("Stadium").cast(ShadowMap) end)
+      pcall(function() V.require("stadium/Stadium").cast(ShadowMap) end)
     end
     ShadowMap.finish(sig)
     return
@@ -424,7 +424,7 @@ local function castShadows(state, arena, terrain, nbMesh, cx, cy, vw, vh,
   -- the water. Un-snugged for the same reason: snug is a bias for a card
   -- rooted to the ground plane, and a model has thickness of its own.
   if not externalActors then
-    pcall(function() V.require("Stadium").cast(ShadowMap) end)
+    pcall(function() V.require("stadium/Stadium").cast(ShadowMap) end)
   end
   -- the capture session's ball, by the same reasoning: real geometry, its
   -- shadow is half of what sells the arc
@@ -526,7 +526,7 @@ function BattleScene.render(state, arena, textures, token, drawActors)
   -- a canopy floor (Viridian Forest) fights under the hour's tint too,
   -- with the rig and the void exactly as they were
   Voxel3D.tint = DayNight.tint(outdoor or DayNight.isCanopy(host))
-  local GlassMask = V.require("GlassMask")
+  local GlassMask = V.require("util/GlassMask")
   Voxel3D.glassMask = outdoor and GlassMask.texture(host.tileset) or nil
   Voxel3D.glassNight = outdoor and DayNight.windowLight() or 0
   -- no glint in the arena: the drift is the shot breathing, not the player
@@ -537,7 +537,7 @@ function BattleScene.render(state, arena, textures, token, drawActors)
   -- thinned so neither mon goes soft -- and its god rays stay out of it:
   -- this camera is low and long, and a bright blade across a combatant
   -- reads as a rendering fault, not weather. nil almost everywhere.
-  local ForestAtmos = V.require("ForestAtmos")
+  local ForestAtmos = V.require("effects/ForestAtmos")
   local atmos = ForestAtmos.frame(host)
   Voxel3D.fog = atmos and { color = atmos.fog.color,
                             density = atmos.fog.density * 0.5,
@@ -635,7 +635,7 @@ function BattleScene.render(state, arena, textures, token, drawActors)
   -- room's void is one flat shade, which is what a room looks like past the
   -- wall, and the disc fight in a cave is lit and coloured as that cave.
   if discs and VoxelScene.skyColor(host, 1) then
-    local Sky = V.require("Sky")
+    local Sky = V.require("effects/Sky")
     local okDress, dressed = pcall(Sky.dress, sky)
     if okDress and dressed then sky = dressed end
   end
@@ -674,7 +674,7 @@ function BattleScene.render(state, arena, textures, token, drawActors)
       -- neighbouring maps, no water, no grass and no flowers -- see the
       -- matching skips further down. What is behind them is the sky the
       -- clear painted.
-      V.require("StadiumStage").draw(arena, groundY)
+      V.require("stadium/StadiumStage").draw(arena, groundY)
     else
     Voxel3D.draw(terrain, atlasFor(host), nil)
     for i, nb in ipairs(neighbors) do
@@ -735,9 +735,9 @@ function BattleScene.render(state, arena, textures, token, drawActors)
     -- sits outside the pair above rather than inside it.
     if not drawActors then
       local okStadium, stadiumErr = pcall(function()
-        V.require("Stadium").draw(BattleBillboard.PULL)
+        V.require("stadium/Stadium").draw(BattleBillboard.PULL)
       end)
-      if not okStadium then V.require("Stadium").report(stadiumErr) end
+      if not okStadium then V.require("stadium/Stadium").report(stadiumErr) end
     end
     -- the capture session's Poke Ball, still inside the flash window and
     -- with the mons' own camera-ward pull, so a ball crossing in front of
@@ -748,7 +748,7 @@ function BattleScene.render(state, arena, textures, token, drawActors)
     -- over the mon they belong to rather than under it, and still inside
     -- the flash window so a burst during a hit is lit like everything else
     pcall(function()
-      V.require("ShinyFx").draw(arena, groundY, BattleBillboard.PULL)
+      V.require("shiny/ShinyFx").draw(arena, groundY, BattleBillboard.PULL)
     end)
     if flashing then Voxel3D.flatten(nil) end
     -- grass and flowers ride the same camera-ward pull the free-roam pass

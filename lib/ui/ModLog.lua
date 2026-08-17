@@ -3,7 +3,7 @@
 -- mod.storage under the key diagnostics/log.
 
 local V = ...
-local Storage = V.require("ModStorage")
+local Storage = V.require("ui/ModStorage")
 local Log = {}
 Log.__index = Log
 

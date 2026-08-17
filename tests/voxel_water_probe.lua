@@ -37,7 +37,7 @@ return function(game)
   local V = game.mods.exports["DRAMATIC_SHAPE"]
   V = V and V.lib
   if not V then return say("mod exports unreachable -- is it enabled?") end
-  local TerrainAtlas = V.require("TerrainAtlas")
+  local TerrainAtlas = V.require("voxel/TerrainAtlas")
 
   local ow = game.overworld
   local map = ow and ow.map
@@ -80,7 +80,7 @@ return function(game)
   end
 
   local colors = nil
-  local VoxelScene = V.require("VoxelScene")
+  local VoxelScene = V.require("voxel/VoxelScene")
   if VoxelScene._modeColors then
     colors = VoxelScene._modeColors(function(m)
       return PaletteFX.pal(game.data, ow:paletteNameFor(m or map))

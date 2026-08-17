@@ -20,7 +20,7 @@ return function(game)
   end
   local V = handle.lib
   do -- prove the RUNNING mod resolves the stool tiles as pinned
-    local TS = V.require("TileShape")
+    local TS = V.require("voxel/TileShape")
     local shapes = TS.forMap({ tileset = { id = "LOBBY",
                                            imageWidth = 128,
                                            imageHeight = 48 } })
@@ -31,9 +31,9 @@ return function(game)
                .. " h=" .. tostring(s.height)) or "nil"))
     end
   end
-  local DayNight = V.require("DayNight")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
+  local DayNight = V.require("effects/DayNight")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
 
   require("src.world.OverworldController").rollEncounter = function() return nil end
   local TileRenderer = require("src.render.TileRenderer")

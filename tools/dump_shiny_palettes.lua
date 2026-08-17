@@ -26,7 +26,7 @@ function V.require(name)
   return loaded[name]
 end
 V.mod = { log = { warn = function() end, info = function() end } }
-local ShinyPalette = V.require("ShinyPalette")
+local ShinyPalette = V.require("shiny/ShinyPalette")
 
 local mons = POK.pokemon or POK
 local rows = {}

@@ -43,8 +43,8 @@ function V.data(name)
 end
 V.mod = { log = { warn = function() end, info = function() end } }
 
-local Shiny = V.require("Shiny")
-local ShinyPalette = V.require("ShinyPalette")
+local Shiny = V.require("shiny/Shiny")
+local ShinyPalette = V.require("shiny/ShinyPalette")
 local Stats = require("src.pokemon.Stats")
 
 -- ------- a tiny harness
@@ -298,7 +298,7 @@ do
   if not (okKit and okPk and species) then
     io.write("note: no fixture dataset; skipped the end-to-end check\n")
   else
-    local ShinyBattle = V.require("ShinyBattle")
+    local ShinyBattle = V.require("shiny/ShinyBattle")
     ShinyBattle.install()
     ShinyBattle.install()   -- twice: the wrap must not stack
 

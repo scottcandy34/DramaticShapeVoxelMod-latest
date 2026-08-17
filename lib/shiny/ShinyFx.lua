@@ -34,9 +34,9 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Voxel3D = V.require("Voxel3D")
-local Mat4 = V.require("Mat4")
-local BattleBillboard = V.require("BattleBillboard")
+local Voxel3D = V.require("voxel/Voxel3D")
+local Mat4 = V.require("util/Mat4")
+local BattleBillboard = V.require("battle/BattleBillboard")
 
 local ShinyFx = {}
 

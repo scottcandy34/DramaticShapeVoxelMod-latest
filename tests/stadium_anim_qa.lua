@@ -209,9 +209,9 @@ local shadowMap = { draw = function(mesh, texture, model)
   if texture then mesh:setTexture(texture) end
 end }
 
-local Pack = V.require("StadiumPack")
-local Rig = V.require("StadiumRig")
-local Mon = V.require("StadiumMon")
+local Pack = V.require("stadium/rom/StadiumPack")
+local Rig = V.require("stadium/mon/StadiumRig")
+local Mon = V.require("stadium/mon/StadiumMon")
 TRAVEL = Mon.TRAVEL
 
 -- ------- findings

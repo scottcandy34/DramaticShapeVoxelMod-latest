@@ -17,10 +17,10 @@ return function(game)
     return love.event.quit()
   end
   local V = handle.lib
-  local FirstPerson = V.require("FirstPerson")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
-  local DayNight = V.require("DayNight")
+  local FirstPerson = V.require("camera/FirstPerson")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
+  local DayNight = V.require("effects/DayNight")
 
   pcall(os.execute, 'mkdir -p "' .. ROOT .. '" 2>/dev/null')
   pcall(os.execute, 'mkdir "' .. ROOT:gsub("/", "\\") .. '" 2>nul')

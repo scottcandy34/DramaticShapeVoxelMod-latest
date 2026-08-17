@@ -41,7 +41,7 @@ return function(game)
     return
   end
   local V = handle.lib
-  local DayNight = V.require("DayNight")
+  local DayNight = V.require("effects/DayNight")
 
   OverworldState.rollEncounter = function() return nil end
 
@@ -126,7 +126,7 @@ return function(game)
   -- bisection tool: when a set of shots will not reproduce, this says
   -- whether what is moving is in the shadow map or somewhere else.
   if os.getenv("AB_SHADOW") == "0" then
-    V.require("Voxel3D").SHADOW_ALPHA = 0
+    V.require("voxel/Voxel3D").SHADOW_ALPHA = 0
   end
 
   -- PaletteFX.MODES, minus the inverted novelties: `ogred` and `classic`
@@ -163,9 +163,9 @@ return function(game)
   -- enough and constant.
   local CAPTURE_FRAMES = 4
 
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
-  local ShadowMap = V.require("ShadowMap")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
+  local ShadowMap = V.require("effects/ShadowMap")
 
   -- Wait for the scene to actually BE the scene the shot is named for.
   -- Two things are still in motion after a teleport, and both are timed in

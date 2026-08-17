@@ -21,10 +21,10 @@ return function(game)
     return love.event.quit()
   end
   local V = handle.lib
-  local FirstPerson = V.require("FirstPerson")
-  local FreeMove = V.require("FreeMove")
-  local Voxel = V.require("VoxelState")
-  local ChunkMesher = V.require("ChunkMesher")
+  local FirstPerson = V.require("camera/FirstPerson")
+  local FreeMove = V.require("camera/FreeMove")
+  local Voxel = V.require("voxel/VoxelState")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
 
   require("src.world.OverworldController").rollEncounter = function() return nil end
 

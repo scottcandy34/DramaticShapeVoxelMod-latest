@@ -17,8 +17,8 @@ return function(game)
 
   local V = game.mods.exports["DRAMATIC_SHAPE"]
   V = V and V.lib
-  local Structures = V and V.require("Structures")
-  local ChunkMesher = V and V.require("ChunkMesher")
+  local Structures = V and V.require("voxel/Structures")
+  local ChunkMesher = V and V.require("voxel/ChunkMesher")
   if not (Structures and ChunkMesher and ChunkMesher.flatTopRow) then
     print("[flattop] FAIL mod, Structures or ChunkMesher.flatTopRow missing")
     love.event.quit(1)

@@ -48,11 +48,11 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Voxel3D = V.require("Voxel3D")
-local StadiumPack = V.require("StadiumPack")
-local StadiumMon = V.require("StadiumMon")
-local ShinyBattle = V.require("ShinyBattle")
-local ShinyFx = V.require("ShinyFx")
+local Voxel3D = V.require("voxel/Voxel3D")
+local StadiumPack = V.require("stadium/rom/StadiumPack")
+local StadiumMon = V.require("stadium/mon/StadiumMon")
+local ShinyBattle = V.require("shiny/ShinyBattle")
+local ShinyFx = V.require("shiny/ShinyFx")
 
 local Stadium = {}
 
@@ -89,7 +89,7 @@ end
 
 -- "A", "B", or nil when the row is on neither stadium rung.
 function Stadium.mode()
-  local OverworldBattle = V.require("OverworldBattle")
+  local OverworldBattle = V.require("battle/OverworldBattle")
   local value = OverworldBattle.setting:get()
   if value == Stadium.VALUE then return "A" end
   if value == Stadium.VALUE_B then return "B" end
@@ -104,7 +104,7 @@ end
 -- Kept as a forwarder because "are we on discs" is a fair thing to ask the
 -- module named after the mode, and because the shot drivers ask it here.
 function Stadium.discs()
-  return V.require("OverworldBattle").discs()
+  return V.require("battle/OverworldBattle").discs()
 end
 
 function Stadium.enabled()
@@ -437,7 +437,7 @@ function Stadium.update(dt, battle, groundY)
     -- LET'S GO capture mode: the player's model is out of the shot the
     -- same way its card and back pic are (the shrink half of the story is
     -- below, AFTER the grow block, which reassigns mon.scale every frame)
-    local cap = V.require("BattleScene").capture
+    local cap = V.require("battle/BattleScene").capture
     if side == "player" and cap and cap.hidePlayer then
       mon.visible = false
     end
@@ -812,7 +812,7 @@ function Stadium.invalidate()
   StadiumPack.invalidate()
   -- the discs are a mesh and a texture like anything else, and a graphics
   -- context that went away took them with it
-  pcall(function() V.require("StadiumStage").invalidate() end)
+  pcall(function() V.require("stadium/StadiumStage").invalidate() end)
 end
 
 return Stadium

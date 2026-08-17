@@ -45,8 +45,8 @@ V.path = MOD
 V.mod = { id = "DRAMATIC_SHAPE",
           log = { warn = function() end, info = function() end } }
 
-local ShinyPics = V.require("ShinyPics")
-local ShinyPalette = V.require("ShinyPalette")
+local ShinyPics = V.require("shiny/ShinyPics")
+local ShinyPalette = V.require("shiny/ShinyPalette")
 local PaletteFX = require("src.render.PaletteFX")
 
 local Data = {

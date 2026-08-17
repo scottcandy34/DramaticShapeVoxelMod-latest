@@ -32,8 +32,8 @@ return function(game)
   local V = game.mods.exports["DRAMATIC_SHAPE"]
   V = V and V.lib
   assert(V, "DRAMATIC_SHAPE exports not reachable")
-  local Voxel = V.require("VoxelState")
-  local ChunkMesher = V.require("ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
 
   local Zoom = require("src.render.Zoom")
   Zoom.reset()

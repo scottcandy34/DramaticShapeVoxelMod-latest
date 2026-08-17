@@ -193,7 +193,7 @@ end
 -- stick click throws (and the "7" key, and the OPTIONS row) all reach it.
 function Diorama.curved()
   local ok, on = pcall(function()
-    return V.require("WorldCurve").active()
+    return V.require("effects/WorldCurve").active()
   end)
   return ok and on or false
 end

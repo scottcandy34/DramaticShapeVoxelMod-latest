@@ -52,17 +52,17 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local ModSetting = V.require("ModSetting")
-local Voxel = V.require("VoxelState")
-local Voxel3D = V.require("Voxel3D")
-local VoxelScene = V.require("VoxelScene")
-local FirstPerson = V.require("FirstPerson")
-local BattleCam = V.require("BattleCam")
-local VRRig = V.require("VRRig")
-local VRXR = V.require("VRXR")
-local VRGL = V.require("VRGL")
-local Pokedex = V.require("Pokedex")
-local Diorama = V.require("Diorama")
+local ModSetting = V.require("ui/settings/ModSetting")
+local Voxel = V.require("voxel/VoxelState")
+local Voxel3D = V.require("voxel/Voxel3D")
+local VoxelScene = V.require("voxel/VoxelScene")
+local FirstPerson = V.require("camera/FirstPerson")
+local BattleCam = V.require("battle/BattleCam")
+local VRRig = V.require("vr/VRRig")
+local VRXR = V.require("vr/VRXR")
+local VRGL = V.require("vr/VRGL")
+local Pokedex = V.require("ui/Pokedex")
+local Diorama = V.require("vr/Diorama")
 
 local VR = {}
 
@@ -156,7 +156,7 @@ local fadeAlpha = 0             -- the black over the eyes right now
 -- The staged fight to look at, if there is one: arena, floor height.
 local function battleStage()
   local ok, arena, groundY = pcall(function()
-    return V.require("OverworldBattle").stage()
+    return V.require("battle/OverworldBattle").stage()
   end)
   if not ok then return nil end
   return arena, groundY
@@ -251,7 +251,7 @@ local function shutdown(reason)
   -- and a stale one left behind would pin the model to wherever the
   -- controller was when the session died -- on the FLAT screen, where the
   -- view model should have taken over
-  V.require("HordeGun").clear()
+  V.require("modes/horde/HordeGun").clear()
   zoom, heightOff = 1, 0
   fpYawOff, snapArmed = 0, true
   camMode, fadeAlpha = "explore", 0
@@ -302,7 +302,7 @@ local function dexScreen()
       fboCache[dexCanvas] = fbo
     end
     if not (fbo and VRGL.copyFrontToCanvas(fbo, ww, wh)) then return nil end
-    local BattleScene = V.require("BattleScene")
+    local BattleScene = V.require("battle/BattleScene")
     local lx, ly, s = BattleScene.letterbox()
     return { dexCanvas,
              lx / ww, ly / wh,
@@ -430,7 +430,7 @@ local function renderWorld(views, ctl)
       if scr then
         Pokedex.screen(scr[1], scr[2], scr[3], scr[4], scr[5])
       end
-    elseif V.require("Horde").active then
+    elseif V.require("modes/horde/Horde").active then
       -- HORDE MODE's readout, on the device already in the player's left
       -- hand. It cannot be a flat overlay: the eye buffers have
       -- ASYMMETRIC frusta, so the same canvas pixel is a different ANGLE
@@ -447,7 +447,7 @@ local function renderWorld(views, ctl)
       -- wears. An inverted rect was tried first, on the theory that a
       -- self-drawn canvas samples from the bottom -- it does not here,
       -- and it stood the readout on its head.
-      local tex = V.require("HordeHud").panelTexture()
+      local tex = V.require("modes/horde/HordeHud").panelTexture()
       if tex then Pokedex.screen(tex, 0, 0, 1, 1) end
     end
   else
@@ -461,9 +461,9 @@ local function renderWorld(views, ctl)
   -- draw because the shot is traced down the model's own axis, so the
   -- matrix has to exist before anything can be hit with it.
   do
-    local HordeGun = V.require("HordeGun")
+    local HordeGun = V.require("modes/horde/HordeGun")
     local right = ctl and (ctl.aimr or ctl.handr) or nil
-    if right and fp and not battle and V.require("Horde").active then
+    if right and fp and not battle and V.require("modes/horde/Horde").active then
       HordeGun.place(right, pivot, anchor, scale, mountYaw)
     else
       HordeGun.clear()
@@ -481,7 +481,7 @@ local function renderWorld(views, ctl)
   -- It bends about the scene centre, which for these eyes is the pivot --
   -- the model's own middle -- so the globe is centred on the model rather
   -- than on wherever a head happens to be standing.
-  local curveK = dio and V.require("WorldCurve").k(vh) or 0
+  local curveK = dio and V.require("effects/WorldCurve").k(vh) or 0
 
   local eyes = {}
   for i = 1, 2 do
@@ -577,7 +577,7 @@ local function updateQuad(worldUp, fp)
   local crop = nil
   local copied = false
   pcall(function()
-    local BattleScene = V.require("BattleScene")
+    local BattleScene = V.require("battle/BattleScene")
     local lx, ly, s = BattleScene.letterbox()
     local wpx = math.ceil(BattleScene.GB_W * s)
     local hpx = math.ceil(BattleScene.GB_H * s)
@@ -690,7 +690,7 @@ local curveWas = nil
 function VR.toggleCurve()
   pcall(function()
     local Game = require("src.core.Game")
-    local WorldCurve = V.require("WorldCurve")
+    local WorldCurve = V.require("effects/WorldCurve")
     local top = WorldCurve.setting.values[#WorldCurve.setting.values]
     if WorldCurve.setting:get() == top then
       WorldCurve.setting:setValue(curveWas or WorldCurve.setting.values[1],
@@ -743,9 +743,9 @@ local function driveControls(ctl, dt, fp, dio)
   -- forwarded, because the mode does not pause. Everything else -- the
   -- stick's walk, the snap turn, A -- keeps working, so the player can
   -- still move and look while they are being chased.
-  local Horde = V.require("Horde")
+  local Horde = V.require("modes/horde/Horde")
   if Horde.playing() then
-    local Gun = V.require("HordeGun")
+    local Gun = V.require("modes/horde/HordeGun")
     if ctl.fireChanged and ctl.fire then Gun.fire() end
     if ctl.bChanged and ctl.b then Gun.reload() end
     setGB(inp, "a", ctl.a)
@@ -985,8 +985,8 @@ function VR.invalidate()
   dexCanvas = nil
   Pokedex.invalidate()
   Diorama.invalidate()      -- the base's mesh and its cave-floor texture
-  V.require("HordeGun").invalidate()
-  V.require("HordeHud").invalidate()
+  V.require("modes/horde/HordeGun").invalidate()
+  V.require("modes/horde/HordeHud").invalidate()
   for k in pairs(fboCache) do fboCache[k] = nil end
 end
 

@@ -58,8 +58,8 @@ function V.require(name)
 end
 V.mod = { log = { warn = function() end, info = function() end } }
 
-local StadiumRom = V.require("StadiumRom")
-local StadiumBuild = V.require("StadiumBuild")
+local StadiumRom = V.require("stadium/rom/StadiumRom")
+local StadiumBuild = V.require("stadium/rom/StadiumBuild")
 
 local function mb()
   return collectgarbage("count") / 1024

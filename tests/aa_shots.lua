@@ -41,11 +41,11 @@ return function(game)
     return
   end
   local V = handle.lib
-  local DayNight = V.require("DayNight")
-  local AntiAlias = V.require("AntiAlias")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
-  local ShadowMap = V.require("ShadowMap")
+  local DayNight = V.require("effects/DayNight")
+  local AntiAlias = V.require("effects/AntiAlias")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
+  local ShadowMap = V.require("effects/ShadowMap")
 
   local MAP = os.getenv("AA_MAP") or "VIRIDIAN_CITY"
   local SPOT = os.getenv("AA_SPOT") or "20,26,up"
@@ -163,7 +163,7 @@ return function(game)
     -- which input moved -- it is how the camera-tween and the neighbour-mesh
     -- settles above were both found.
     if os.getenv("AA_TRACE") == "1" then
-      local Voxel3D = V.require("Voxel3D")
+      local Voxel3D = V.require("voxel/Voxel3D")
       local o = game.overworld
       local cw, chh = Voxel3D.size()
       print(("[aa] trace samples=%d angle=%.6f fov=%.6f cell=%.4f canvas=%dx%d cam=(%.3f,%.3f) eye=(%.2f,%.2f,%.2f) factor=%.4f")

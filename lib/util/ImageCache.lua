@@ -30,7 +30,7 @@
 local V = ...
 
 local Assets = require("src.render.Assets")
-local Perf = V.require("Perf")
+local Perf = V.require("util/Perf")
 
 local ImageCache = {}
 

@@ -275,7 +275,7 @@ local function heightAt(map, wx, wz)
     -- ring is trees; treat it as solid so an arena is never framed through it
     return 32
   end
-  local ok, h = pcall(V.require("VoxelScene").groundAt, map, cx, cy)
+  local ok, h = pcall(V.require("voxel/VoxelScene").groundAt, map, cx, cy)
   return (ok and h) or 0
 end
 
@@ -299,7 +299,7 @@ end
 
 -- Whether both mons would be in plain view from the battle camera.
 function BattleArena.clearance(map, arena)
-  local BattleCam = V.require("BattleCam")
+  local BattleCam = V.require("battle/BattleCam")
   -- the CANONICAL shot: whether a fight fits somewhere is a fact about the
   -- ground, so it must not depend on the drift's phase or on where the
   -- player last swung the camera (see BattleCam.rig's third argument)

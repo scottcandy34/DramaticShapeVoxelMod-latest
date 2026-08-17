@@ -19,7 +19,7 @@ return function(game)
   end
   local V = handle.lib
   do -- what does the RUNNING mod think tile 84 on FOREST is?
-    local TS = V.require("TileShape")
+    local TS = V.require("voxel/TileShape")
     local shapes = TS.forMap({ tileset = { id = "FOREST",
                                            imageWidth = 128,
                                            imageHeight = 48 } })
@@ -28,9 +28,9 @@ return function(game)
       .. (s and (tostring(s.class) .. "/" .. tostring(s.art)
                  .. " authored=" .. tostring(s.authored)) or "nil"))
   end
-  local DayNight = V.require("DayNight")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
+  local DayNight = V.require("effects/DayNight")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
 
   require("src.world.OverworldController").rollEncounter = function() return nil end
   local TileRenderer = require("src.render.TileRenderer")

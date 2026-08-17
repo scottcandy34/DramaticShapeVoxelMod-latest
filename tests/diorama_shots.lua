@@ -32,16 +32,16 @@ return function(game)
     return
   end
   local V = handle.lib
-  local Voxel = V.require("VoxelState")
-  local Voxel3D = V.require("Voxel3D")
-  local VoxelScene = V.require("VoxelScene")
-  local VRRig = V.require("VRRig")
-  local Diorama = V.require("Diorama")
-  local Water = V.require("Water")
-  local ChunkMesher = V.require("ChunkMesher")
-  local DayNight = V.require("DayNight")
-  local VR = V.require("VR")
-  local Curve = V.require("WorldCurve")
+  local Voxel = V.require("voxel/VoxelState")
+  local Voxel3D = V.require("voxel/Voxel3D")
+  local VoxelScene = V.require("voxel/VoxelScene")
+  local VRRig = V.require("vr/VRRig")
+  local Diorama = V.require("vr/Diorama")
+  local Water = V.require("effects/Water")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local DayNight = V.require("effects/DayNight")
+  local VR = V.require("vr/VR")
+  local Curve = V.require("effects/WorldCurve")
 
   local MAP = os.getenv("DIO_MAP") or "VIRIDIAN_CITY"
   local SPOT = os.getenv("DIO_SPOT") or "20,26,up"
@@ -145,7 +145,7 @@ return function(game)
   shoot("keyed-ball", { mode = "diorama-mr", curve = 3 })
   do
     -- a fight's disc, cut about the arena the map would actually stage on
-    local BattleArena = V.require("BattleArena")
+    local BattleArena = V.require("battle/BattleArena")
     local ow = game.overworld
     local arena = BattleArena.find(ow.map, ow.player.cellX, ow.player.cellY,
                                    false)

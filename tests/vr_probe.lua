@@ -17,9 +17,9 @@ return function(game)
     return love.event.quit()
   end
   local V = handle.lib
-  local VR = V.require("VR")
-  local VRGL = V.require("VRGL")
-  local Voxel = V.require("VoxelState")
+  local VR = V.require("vr/VR")
+  local VRGL = V.require("vr/VRGL")
+  local Voxel = V.require("voxel/VoxelState")
 
   U.teleport(game, "PALLET_TOWN", 10, 12, "down")
   Pipelines.setLevel("voxel", 2)

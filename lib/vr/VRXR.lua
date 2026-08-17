@@ -29,7 +29,7 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local VRGL = V.require("VRGL")
+local VRGL = V.require("vr/VRGL")
 
 local VRXR = {}
 

@@ -22,9 +22,9 @@ return function(game)
     return
   end
   local V = handle.lib
-  local DayNight = V.require("DayNight")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel = V.require("VoxelState")
+  local DayNight = V.require("effects/DayNight")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel = V.require("voxel/VoxelState")
 
   require("src.world.OverworldController").rollEncounter = function() return nil end
   local TileRenderer = require("src.render.TileRenderer")

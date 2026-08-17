@@ -38,15 +38,15 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local ModSetting = V.require("ModSetting")
-local BattleArena = V.require("BattleArena")
-local BattleCam = V.require("BattleCam")
-local BattleScene = V.require("BattleScene")
-local BattleDOF = V.require("BattleDOF")
-local BattleHud = V.require("BattleHud")
-local BattlePics = V.require("BattlePics")
-local Voxel3D = V.require("Voxel3D")
-local ChunkMesher = V.require("ChunkMesher")
+local ModSetting = V.require("ui/settings/ModSetting")
+local BattleArena = V.require("battle/BattleArena")
+local BattleCam = V.require("battle/BattleCam")
+local BattleScene = V.require("battle/BattleScene")
+local BattleDOF = V.require("battle/BattleDOF")
+local BattleHud = V.require("battle/BattleHud")
+local BattlePics = V.require("battle/BattlePics")
+local Voxel3D = V.require("voxel/Voxel3D")
+local ChunkMesher = V.require("voxel/ChunkMesher")
 
 local OverworldBattle = {}
 
@@ -518,7 +518,7 @@ end
 function OverworldBattle.stageFor(state)
   if OverworldBattle.discs() and Voxel3D.available() then
     local okStage, arena = pcall(function()
-      return V.require("StadiumStage").arena(state.map)
+      return V.require("stadium/StadiumStage").arena(state.map)
     end)
     if okStage and arena then return arena end
     -- the discs could not be built; fall through to the map, which is a
@@ -553,7 +553,7 @@ function OverworldBattle.begin(state, battle)
   BattleCam.reset()
   -- and, on the STADIUM rung, the pair of models that will stand on this
   -- arena's two cells. Declines quietly on any other rung.
-  pcall(function() V.require("Stadium").begin(arena) end)
+  pcall(function() V.require("stadium/Stadium").begin(arena) end)
   return true
 end
 
@@ -634,7 +634,7 @@ function OverworldBattle.finish()
   restoreCast()
   session = nil
   Voxel3D.camera = nil
-  pcall(function() V.require("Stadium").finish() end)
+  pcall(function() V.require("stadium/Stadium").finish() end)
   if V.log then V.log:event("owbattle", "finish", {}) end
 end
 
@@ -655,7 +655,7 @@ function OverworldBattle.update(dt)
   -- the shiny arrival sparkle's clock. Ticked here rather than in the draw
   -- because a paused or covered frame still draws, and a burst that
   -- advanced on draws would stall behind a text box mid-twinkle.
-  pcall(function() V.require("ShinyFx").update(dt) end)
+  pcall(function() V.require("shiny/ShinyFx").update(dt) end)
 
   local g = game()
   local top = g and g.stack and g.stack:top()
@@ -689,7 +689,7 @@ function OverworldBattle.update(dt)
   -- wheel, the keys, the mouse and a drag all arrive as events and have
   -- already landed, but a stick is a HELD position and only a tick can
   -- turn it into travel (CamControl, which owns every one of those inputs)
-  pcall(V.require("CamControl").tick, dt)
+  pcall(V.require("camera/CamControl").tick, dt)
   BattleCam.update(dt)
   -- the battle only exists once it has been pushed; a session opened at
   -- pushBattle time has it, one opened from battle.started was handed it
@@ -711,7 +711,7 @@ function OverworldBattle.update(dt)
   -- headset, both eyes all draw the same skinned meshes.
   pcall(function()
     local host = (session.arena and session.arena.map) or session.state.map
-    V.require("Stadium").update(dt, session.battle,
+    V.require("stadium/Stadium").update(dt, session.battle,
                                 BattleScene.groundY(host, session.arena))
   end)
 
@@ -730,7 +730,7 @@ function OverworldBattle.update(dt)
   -- pass draws it (the flat screen has the animations in-frame already)
   session.animTex = nil
   local okVR, vrOn = pcall(function()
-    local vr = V.require("VR")
+    local vr = V.require("vr/VR")
     return vr.active and vr.active() or false
   end)
   if okVR and vrOn and session.battle then
@@ -929,7 +929,7 @@ function OverworldBattle.invalidate()
   BattlePics.invalidate()
   -- the STADIUM models hold meshes and textures of this graphics context
   -- like everything else here does
-  pcall(function() V.require("Stadium").invalidate() end)
+  pcall(function() V.require("stadium/Stadium").invalidate() end)
 end
 
 -- ------- the battle screen's background
@@ -1143,7 +1143,7 @@ function OverworldBattle.sideTexture(battle, side)
   -- cell. Asked per side, so a species with no pack -- or a substitute
   -- doll, or the trainer before the send-out -- still comes through here.
   local okS, covered = pcall(function()
-    return V.require("Stadium").covers(battle, side)
+    return V.require("stadium/Stadium").covers(battle, side)
   end)
   if okS and covered then return nil end
   if not sideVisible(battle, side) then return nil end
@@ -1241,7 +1241,7 @@ function OverworldBattle.textures(battle)
   -- carries the HIT FLASH, and because the VR eye pass uses its presence to
   -- decide there is a staged fight to draw at all.
   local okStanding, standing = pcall(function()
-    return V.require("Stadium").standing()
+    return V.require("stadium/Stadium").standing()
   end)
   if not (out.enemy or out.player or (okStanding and standing)) then
     return nil
@@ -1272,7 +1272,7 @@ function OverworldBattle.install()
   -- off the fight (see Stadium.install). Idempotent in the same way, and
   -- installed whichever rung the row is on: the wraps do nothing at all
   -- while no stadium session is live.
-  pcall(function() V.require("Stadium").install() end)
+  pcall(function() V.require("stadium/Stadium").install() end)
 
   local BattleState = require("src.battle.BattleState")
   if BattleState.dramaticShapeBattleHook then return end
@@ -1344,7 +1344,7 @@ function OverworldBattle.install()
   -- intro), and the engine's `battle.overlay` hook is only reached through
   -- the tail of the engine's draw. See lib/ShinyFlash.lua.
   local function shinyFlash(battle)
-    pcall(function() V.require("ShinyFlash").render(battle) end)
+    pcall(function() V.require("shiny/ShinyFlash").render(battle) end)
   end
 
   local innerDraw = BattleState.draw

@@ -44,7 +44,7 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Mat4 = V.require("Mat4")
+local Mat4 = V.require("util/Mat4")
 
 local VRRig = {}
 

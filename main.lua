@@ -27,7 +27,7 @@
 -- nothing about what it IS.  TWO rungs are the deliberate exception. 1ST
 -- (the camera in the player's own eyes) and 3RD (the same rig, boomed back
 -- behind their shoulder) replace the grid WALK with a free,
--- camera-relative one while either is selected (lib/FreeMove.lua), because
+-- camera-relative one while either is selected (lib/camera/FreeMove.lua), because
 -- a camera you can steer with a mouse demands feet that go where it looks.
 -- Even there the game is untouched: the walk asks the engine's own
 -- collision the same questions a grid step asks, keeps the player's
@@ -78,59 +78,59 @@ end
 
 -- ------- pipelines
 
-local Voxel = V.require("VoxelState")
-local Voxel3D = V.require("Voxel3D")
-local VoxelScene = V.require("VoxelScene")
-local TiltShift = V.require("TiltShift")
-local ChunkMesher = V.require("ChunkMesher")
-local VoxelCacheScreen = V.require("VoxelCacheScreen")
-local VoxelGrid = V.require("VoxelGrid")
-local WorldCurve = V.require("WorldCurve")
-local ViewBox = V.require("ViewBox")
-local OverworldBattle = V.require("OverworldBattle")
-local StadiumBattleFxProvider = V.require("StadiumBattleFxProvider")
-local BattleExit = V.require("BattleExit")
-local Shiny = V.require("Shiny")
-local ShinyBattle = V.require("ShinyBattle")
-local ShinyUI = V.require("ShinyUI")
-local ShinyPics = V.require("ShinyPics")
-local ShinyFlash = V.require("ShinyFlash")
-local DayNight = V.require("DayNight")
-local DayTint = V.require("DayTint")
-local Water = V.require("Water")
-local ForestAtmos = V.require("ForestAtmos")
-local Shadows = V.require("Shadows")
-local AntiAlias = V.require("AntiAlias")
-local FirstPerson = V.require("FirstPerson")
-local FreeMove = V.require("FreeMove")
-local CamControl = V.require("CamControl")
-local VR = V.require("VR")
+local Voxel = V.require("voxel/VoxelState")
+local Voxel3D = V.require("voxel/Voxel3D")
+local VoxelScene = V.require("voxel/VoxelScene")
+local TiltShift = V.require("effects/TiltShift")
+local ChunkMesher = V.require("voxel/ChunkMesher")
+local VoxelCacheScreen = V.require("voxel/VoxelCacheScreen")
+local VoxelGrid = V.require("voxel/VoxelGrid")
+local WorldCurve = V.require("effects/WorldCurve")
+local ViewBox = V.require("voxel/ViewBox")
+local OverworldBattle = V.require("battle/OverworldBattle")
+local StadiumBattleFxProvider = V.require("stadium/fx/StadiumBattleFxProvider")
+local BattleExit = V.require("battle/BattleExit")
+local Shiny = V.require("shiny/Shiny")
+local ShinyBattle = V.require("shiny/ShinyBattle")
+local ShinyUI = V.require("shiny/ShinyUI")
+local ShinyPics = V.require("shiny/ShinyPics")
+local ShinyFlash = V.require("shiny/ShinyFlash")
+local DayNight = V.require("effects/DayNight")
+local DayTint = V.require("effects/DayTint")
+local Water = V.require("effects/Water")
+local ForestAtmos = V.require("effects/ForestAtmos")
+local Shadows = V.require("effects/Shadows")
+local AntiAlias = V.require("effects/AntiAlias")
+local FirstPerson = V.require("camera/FirstPerson")
+local FreeMove = V.require("camera/FreeMove")
+local CamControl = V.require("camera/CamControl")
+local VR = V.require("vr/VR")
 -- the mod's settings menus: the categories, the screens they open, and the
 -- red ink that marks this mod's one row on the engine's OPTIONS list
-local SettingsMenu = V.require("SettingsMenu")
+local SettingsMenu = V.require("ui/settings/SettingsMenu")
 -- HORDE MODE: the konami code's minigame. Horde owns the state machine and
 -- every hook; the other four are the gun, the crowd, the readout and the
--- chip-synthesized sounds it fires. See lib/Horde.lua for the whole design.
-local Horde = V.require("Horde")
-local HordeGun = V.require("HordeGun")
-local HordeHud = V.require("HordeHud")
-local HordeSfx = V.require("HordeSfx")
+-- chip-synthesized sounds it fires. See lib/horde/Horde.lua for the whole design.
+local Horde = V.require("modes/horde/Horde")
+local HordeGun = V.require("modes/horde/HordeGun")
+local HordeHud = V.require("modes/horde/HordeHud")
+local HordeSfx = V.require("modes/horde/HordeSfx")
 -- LET'S GO: the flick-to-throw capture mode. LetsGo owns the row, the
 -- wraps and the experience math; CatchThrow the session (input, arc,
 -- ring, choreography); Pokeball the animated prop they throw.
-local LetsGo = V.require("LetsGo")
-local Pokeball = V.require("Pokeball")
+local LetsGo = V.require("modes/catch/LetsGo")
+local Pokeball = V.require("modes/catch/Pokeball")
 
 -- ------- diagnostics (mod.storage-backed log)
 --
 -- Same idea as StadiumBattleFX: a ring of event lines persisted under
 -- diagnostics/log in this mod's playthrough storage, exportable via
 -- mod.exports.diagnosticLog() and a SAVE DIAGNOSTIC SNAPSHOT options row.
-local ModStorage = V.require("ModStorage")
+local ModStorage = V.require("ui/ModStorage")
 V.storage = ModStorage
-local ModLog = V.require("ModLog")
+local ModLog = V.require("ui/ModLog")
 V.log = ModLog.new(mod.log)
-local ModLogExport = V.require("ModLogExport")
+local ModLogExport = V.require("ui/ModLogExport")
 
 -- Compatibility bridge used by gen2-gold-beta-style call sites (V.dlog).
 -- Routes into the persistent mod.storage log instead of love.filesystem.
@@ -325,11 +325,11 @@ mod.content.render_pipelines:register("voxel", {
     -- asks exactly once, on the first frame the player is actually in the
     -- world, so it is never fighting the engine's own launcher for the
     -- screen.
-    pcall(function() V.require("StadiumScreen").maybePush() end)
+    pcall(function() V.require("stadium/StadiumScreen").maybePush() end)
     -- and a ROM the system file picker dropped in the save directory while
     -- we were not the top activity (Android; see StadiumRomPick.poll)
     pcall(function()
-      V.require("StadiumRomPick").poll(require("src.core.Game"))
+      V.require("stadium/rom/StadiumRomPick").poll(require("src.core.Game"))
     end)
     -- The horde, on the same always-running tick and for the same reason:
     -- it owns no pass of the frame, it is a MODE over the overworld, and
@@ -857,7 +857,7 @@ end
 
 -- The VR stick click makes this same step (VR.stepView): the function is
 -- a local of this file, so the handoff is explicit rather than a
--- reimplementation drifting out of date in lib/VR.lua.
+-- reimplementation drifting out of date in lib/vr/VR.lua.
 VR.cycleVoxel = cycleVoxel
 VR.setVoxelLevel = setVoxelLevel
 
@@ -940,7 +940,7 @@ end
 --
 -- Now there is ONE row, and it leads the list. What it opens -- the
 -- categories, the screens, and why the split falls where it does -- is
--- lib/SettingsMenu.lua. VOXEL and T-SHIFT go with it: they are this mod's
+-- lib/ui/SettingsMenu.lua. VOXEL and T-SHIFT go with it: they are this mod's
 -- display modes, the engine only spliced them beside TILT because it had
 -- nowhere better, and TILT is not on the menu any more anyway (see below).
 --
@@ -1298,7 +1298,7 @@ do
     -- ------- and the mod's own row is red
     --
     -- Why this is a palette zone and not love.graphics.setColor -- twice over
-    -- -- is written out in lib/SettingsMenu.lua, next to the code that builds
+    -- -- is written out in lib/ui/SettingsMenu.lua, next to the code that builds
     -- the palette. The short of it: setColor picks a SHADE on this screen and
     -- the zone picks the COLOR.
     --
@@ -1332,7 +1332,7 @@ end
 -- ------- battles on the map
 --
 -- The wraps this needs -- OverworldState:pushBattle, BattleState:draw and
--- BattleState:drawHUDs -- all live in lib/OverworldBattle.lua, which is
+-- BattleState:drawHUDs -- all live in lib/battle/OverworldBattle.lua, which is
 -- where the reasoning for each one is written down. Installed once, here,
 -- so this file keeps naming every engine seam the mod touches.
 OverworldBattle.install()
@@ -1349,7 +1349,7 @@ OverworldBattle.install()
 -- calls it "the RBY virtual shiny" and says it is there for indicator mods.
 -- So nothing new is stored on a Pokemon and nothing has to migrate: every
 -- save ever made already contains the answer, and this only starts drawing
--- it. See lib/Shiny.lua for why deriving beats storing.
+-- it. See lib/shiny/Shiny.lua for why deriving beats storing.
 --
 -- Three seams, each in its own file with its own reasoning:
 --   ShinyBattle  wraps Pokemon.new, which is where every wild, gift,
@@ -1366,7 +1366,7 @@ OverworldBattle.install()
 --                Game Boy's own pixel grid over the pic
 --
 -- The Stadium models need no seam here at all: their recolour happens at
--- extraction (lib/StadiumBuild.lua), and the battle simply asks for the
+-- extraction (lib/stadium/StadiumBuild.lua), and the battle simply asks for the
 -- shiny pack.
 ShinyBattle.install()
 ShinyUI.install()
@@ -1395,7 +1395,7 @@ mod.events:on("save.created", function() ShinyBattle.markParty() end)
 --
 -- 1ST and 3RD need two things no other rung does, and each is a named seam.
 -- Both rungs are one rig -- the boom behind the shoulder is a number inside
--- it (lib/ThirdPerson.lua) -- so both are installed by the same two calls:
+-- it (lib/camera/ThirdPerson.lua) -- so both are installed by the same two calls:
 --
 -- FirstPerson.install claims the LOOK inputs the engine ignores: the right
 -- stick's axes (Game:gamepadaxis passes them to Input, which returns early
@@ -1447,7 +1447,7 @@ end
 -- from the OPTIONS row instead.
 do
   local ok, err = pcall(function()
-    V.require("StadiumRomPick").install()
+    V.require("stadium/rom/StadiumRomPick").install()
   end)
   if ok then V.log:event("input", "StadiumRomPick.install", { ok = "true" })
   else V.log:error("StadiumRomPick.install failed: %s", tostring(err)) end
@@ -1491,7 +1491,7 @@ end
 -- outside FreeMove's and SELECT's. The detector itself does not live on
 -- handleInput at all -- it reads the fixed step's own press queue, which
 -- is where keyboard, pad, touch and the VR controllers have all already
--- become the same eight buttons. See lib/Horde.lua.
+-- become the same eight buttons. See lib/modes/horde/Horde.lua.
 Horde.install()
 
 -- ------- LET'S GO capture mode
@@ -1576,7 +1576,7 @@ end)
 -- and cuts straight OUT of it. That cut is between two very different cameras
 -- in this mode, so while voxel mode is on the battle fades out, closes behind
 -- the black, and the map fades up. The two seams it needs -- BattleState:finish
--- and Renderer:endFrame -- and the reasoning for each live in lib/BattleExit.lua.
+-- and Renderer:endFrame -- and the reasoning for each live in lib/battle/BattleExit.lua.
 --
 -- Declared as a transitions record rather than a constant in that file, so the
 -- fade is retunable in data exactly like the eight wipes it answers, and a total

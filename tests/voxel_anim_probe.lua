@@ -55,7 +55,7 @@ return function(game)
   -- geometry (baked into prop prisms, say) rather than not animating
   local V = game.mods.exports["DRAMATIC_SHAPE"]
   V = V and V.lib
-  local TerrainAtlas = V and V.require("TerrainAtlas")
+  local TerrainAtlas = V and V.require("voxel/TerrainAtlas")
   local PaletteFX = require("src.render.PaletteFX")
   local function dumpAtlas(tag)
     if not TerrainAtlas then return end
@@ -88,7 +88,7 @@ return function(game)
   -- cell Structures turned into a prop prism has its pixels baked as
   -- point-sampled voxels and would not
   if V and specs then
-    local Structures = V.require("Structures")
+    local Structures = V.require("voxel/Structures")
     local ow = game.overworld
     local S = ow and ow.map and Structures.forMap(ow.map)
     if S then

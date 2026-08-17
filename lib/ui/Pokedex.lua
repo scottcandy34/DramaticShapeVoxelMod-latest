@@ -30,9 +30,9 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Mat4 = V.require("Mat4")
-local Voxel3D = V.require("Voxel3D")
-local VRRig = V.require("VRRig")
+local Mat4 = V.require("util/Mat4")
+local Voxel3D = V.require("voxel/Voxel3D")
+local VRRig = V.require("vr/VRRig")
 
 local Pokedex = {}
 

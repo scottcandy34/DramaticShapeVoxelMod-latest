@@ -41,7 +41,7 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Shiny = V.require("Shiny")
+local Shiny = V.require("shiny/Shiny")
 
 local ShinyFlash = {}
 

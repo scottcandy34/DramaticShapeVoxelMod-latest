@@ -36,7 +36,7 @@ return function(game)
 
   local V = game.mods.exports["DRAMATIC_SHAPE"]
   V = V and V.lib
-  local Structures = V and V.require("Structures")
+  local Structures = V and V.require("voxel/Structures")
   local ow = game.overworld
   if Structures and ow and ow.map then
     local S = Structures.forMap(ow.map)

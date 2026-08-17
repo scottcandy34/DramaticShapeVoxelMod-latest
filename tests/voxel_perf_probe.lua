@@ -23,11 +23,11 @@ return function(game)
     return
   end
   local V = handle.lib
-  local Structures = V.require("Structures")
-  local ChunkMesher = V.require("ChunkMesher")
-  local Voxel3D = V.require("Voxel3D")
-  local TerrainAtlas = V.require("TerrainAtlas")
-  local TileShape = V.require("TileShape")
+  local Structures = V.require("voxel/Structures")
+  local ChunkMesher = V.require("voxel/ChunkMesher")
+  local Voxel3D = V.require("voxel/Voxel3D")
+  local TerrainAtlas = V.require("voxel/TerrainAtlas")
+  local TileShape = V.require("voxel/TileShape")
 
   -- ---- pass 1: instrument the build ----
   local stats, order = {}, {}

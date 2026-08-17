@@ -46,8 +46,8 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Mat4 = V.require("Mat4")
-local Voxel3D = V.require("Voxel3D")
+local Mat4 = V.require("util/Mat4")
+local Voxel3D = V.require("voxel/Voxel3D")
 
 local StadiumStage = {}
 
@@ -297,7 +297,7 @@ end
 StadiumStage.ORIGIN = { 16, 16 }
 
 function StadiumStage.arena(map)
-  local BattleArena = V.require("BattleArena")
+  local BattleArena = V.require("battle/BattleArena")
   local arena = BattleArena.at(StadiumStage.ORIGIN[1], StadiumStage.ORIGIN[2],
                                "wide")
   if not arena then return nil end

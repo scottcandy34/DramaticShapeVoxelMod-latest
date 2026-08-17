@@ -42,7 +42,7 @@ local V = ...
 -- src.pokemon.Stats precisely so an indicator mod can call isShiny
 local Stats = require("src.pokemon.Stats")
 
-local ModSetting = V.require("ModSetting")
+local ModSetting = V.require("ui/settings/ModSetting")
 
 local Shiny = {}
 

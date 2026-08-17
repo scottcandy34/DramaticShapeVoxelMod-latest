@@ -45,8 +45,8 @@ function V.data(name)
   return dataFiles[name]
 end
 
-local TileShape = V.require("TileShape")
-local Structures = V.require("Structures")
+local TileShape = V.require("voxel/TileShape")
+local Structures = V.require("voxel/Structures")
 
 -- ------- the authored mask parses
 

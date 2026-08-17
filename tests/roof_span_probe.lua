@@ -14,7 +14,7 @@ return function(game)
 
   local V = game.mods.exports["DRAMATIC_SHAPE"]
   V = V and V.lib
-  local Structures = V and V.require("Structures")
+  local Structures = V and V.require("voxel/Structures")
   local ow = game.overworld
   if not (Structures and ow and ow.map) then
     print("[span] mod or map unavailable")

@@ -36,11 +36,11 @@
 -- the mod namespace (see main.lua): V.require loads a sibling module
 local V = ...
 
-local Voxel = V.require("VoxelState")
-local Voxel3D = V.require("Voxel3D")
-local FirstPerson = V.require("FirstPerson")
-local ThirdPerson = V.require("ThirdPerson")
-local BattleCam = V.require("BattleCam")
+local Voxel = V.require("voxel/VoxelState")
+local Voxel3D = V.require("voxel/Voxel3D")
+local FirstPerson = V.require("camera/FirstPerson")
+local ThirdPerson = V.require("camera/ThirdPerson")
+local BattleCam = V.require("battle/BattleCam")
 
 local CamControl = {}
 
@@ -72,7 +72,7 @@ CamControl.SURVEY_PINCH = 2.2
 -- angle from before the setting was switched on stands down with it).
 local function battleLive()
   local ok, shot = pcall(function()
-    return V.require("OverworldBattle").shot()
+    return V.require("battle/OverworldBattle").shot()
   end)
   return (ok and shot and BattleCam.steerable) and true or false
 end
