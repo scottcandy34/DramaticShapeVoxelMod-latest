@@ -35,8 +35,8 @@ local Voxel = {}
 --
 -- 1ST and 3RD are the other rungs that are more than an angle: the camera
 -- steps off its orbit entirely and stands with the player -- in their eyes
--- (lib/FirstPerson.lua), or on a boom behind their shoulder
--- (lib/ThirdPerson.lua) -- with free look and free movement on both. Their
+-- (lib/camera/FirstPerson.lua), or on a boom behind their shoulder
+-- (lib/camera/ThirdPerson.lua) -- with free look and free movement on both. Their
 -- ANGLE entries are 75 -- the orbit rung they hand over from -- because the
 -- tween in and out starts from whatever the orbit shows, and the lowest rung
 -- is the one a dive into a head should start from. Everything angle-derived
@@ -62,7 +62,7 @@ function Voxel.isFirstPerson(level)
 end
 
 -- and the third-person one, which is the same rig with the eye boomed off
--- the back of the head (lib/ThirdPerson.lua)
+-- the back of the head (lib/camera/ThirdPerson.lua)
 Voxel.TP_LEVEL = 7
 
 function Voxel.isThirdPerson(level)

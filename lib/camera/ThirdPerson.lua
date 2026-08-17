@@ -26,7 +26,7 @@
 --                 it.
 --
 -- Deliberately NOT here: the attitude, the look inputs, the blend, the
--- move intent (all lib/FirstPerson.lua, which drives this module and reads
+-- move intent (all lib/camera/FirstPerson.lua, which drives this module and reads
 -- its answer while building the frame's rig), and movement itself
 -- (lib/FreeMove.lua, unchanged -- the walk is camera-relative either way,
 -- and the camera's yaw is the same number on both rungs).

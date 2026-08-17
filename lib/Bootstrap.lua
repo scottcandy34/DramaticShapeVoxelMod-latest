@@ -15,10 +15,8 @@ local VR = V.require("vr/VR")
 local Horde = V.require("modes/horde/Horde")
 local LetsGo = V.require("modes/catch/LetsGo")
 
-local ModStorage = V.require("ui/ModStorage")
-V.storage = ModStorage
-local ModLog = V.require("ui/ModLog")
-V.log = ModLog.new(V.mod.log)
+-- Storage and log are established in main.lua before this module is required.
+local ModStorage = V.storage
 
 local Hotkeys         = V.require("ui/Hotkeys")
 local cycleVoxel      = Hotkeys.cycleVoxel

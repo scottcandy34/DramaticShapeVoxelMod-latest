@@ -10,7 +10,7 @@
 -- eye and focus the same way it always has.
 --
 -- 3RD is that same rig with the eye pulled back onto a boom behind the
--- player's shoulder (lib/ThirdPerson.lua). Everything in this file is
+-- player's shoulder (lib/camera/ThirdPerson.lua). Everything in this file is
 -- already general over where the eye stands -- the attitude, the look
 -- inputs, the move intent, the cards that turn to face the eye -- so the
 -- third-person rung is one number applied at the very end of frame(),

@@ -52,7 +52,7 @@ local V = ...
 
 local Assets = require("src.render.Assets")
 local Structures = V.require("voxel/Structures")
-local Buildings = V.require("voxel/Buildings")
+local Buildings = V.require("voxel/structures/Buildings")
 local TileShape = V.require("voxel/TileShape")
 local Voxel3D = V.require("voxel/Voxel3D")
 local Budget = V.require("util/BuildBudget")

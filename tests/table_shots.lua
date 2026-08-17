@@ -20,7 +20,7 @@ return function(game)
     return
   end
   local V = handle.lib
-  local Buildings = V.require("voxel/Buildings")
+  local Buildings = V.require("voxel/structures/Buildings")
   local DayNight = V.require("effects/DayNight")
   local ChunkMesher = V.require("voxel/ChunkMesher")
   local Voxel = V.require("voxel/VoxelState")

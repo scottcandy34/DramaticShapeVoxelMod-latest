@@ -59,7 +59,7 @@ return function(game)
   local loadBytes = V.loadBytes
   local Structures = V.require("voxel/Structures")
   local ChunkMesher = V.require("voxel/ChunkMesher")
-  local Buildings = V.require("voxel/Buildings")
+  local Buildings = V.require("voxel/structures/Buildings")
   local DayNight = V.require("effects/DayNight")
   local VoxelScene = V.require("voxel/VoxelScene")
 
