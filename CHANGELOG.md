@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.5
+
+### Added
+
+- **Persistent BODY mesh cache (Android-focused performance).**
+  Expensive voxel geometry is prepared once, stored under the mod’s persistence directory, and reused across sessions. The cache is versioned and fingerprinted so stale or corrupt entries fall back to a rebuild. Neighbouring cached maps load progressively; loading and GPU uploads are chunked to avoid replacing a generation hitch with an upload hitch. After the initial cache preparation, walking and route/city transitions are smooth on device and the multi-second freezes from synchronous generation are eliminated. Addresses the Android performance side of the old issue #10.
+
 ## 1.8.4
 
 ### Fixed
