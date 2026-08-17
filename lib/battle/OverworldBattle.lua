@@ -117,7 +117,7 @@ OverworldBattle.setting =
                  { "2D-3D A", "2D-3D B", "STADIUM A", "STADIUM B", "OFF" })
   :setGate(function(value)
     if value ~= "stadium" and value ~= "stadiumB" then return true end
-    local ok, install = pcall(V.require, "StadiumInstall")
+    local ok, install = pcall(V.require, "stadium/rom/StadiumInstall")
     return ok and install and install.available()
   end)
 
@@ -141,7 +141,7 @@ end
 -- all assume a fight standing on the world, and a white-field battle
 -- inside a headset is exactly the flat screen VR exists to replace.
 local function vrOn()
-  local ok, vr = pcall(V.require, "VR")
+  local ok, vr = pcall(V.require, "vr/VR")
   return ok and vr and vr.enabled and vr.enabled() or false
 end
 
@@ -155,7 +155,7 @@ end
 -- describes. Required lazily: Stadium sits above this file and requires it
 -- back (for the row), which a load-time require would deadlock.
 function OverworldBattle.stadium()
-  local ok, stadium = pcall(V.require, "Stadium")
+  local ok, stadium = pcall(V.require, "stadium/Stadium")
   return (ok and stadium and stadium.enabled()) and true or false
 end
 
@@ -1603,7 +1603,7 @@ function OverworldBattle.snapHUDs(battle, shot)
   -- of VR's battle screens (the floating panel and the pokedex's) crop
   -- to the letterbox, and a block snapped out to the window's edge would
   -- be cropped away with the window around it.
-  local okV, vr = pcall(V.require, "VR")
+  local okV, vr = pcall(V.require, "vr/VR")
   if okV and vr and vr.active and vr.active() then return false end
   local slide = (battle.introSlide or 0) * 4
   local rects, bandX = OverworldBattle.snapRects(shot)

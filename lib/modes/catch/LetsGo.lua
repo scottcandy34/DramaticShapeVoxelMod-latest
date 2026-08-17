@@ -100,7 +100,7 @@ end
 -- ------- whether a throw can be the minigame
 
 local function vrOn()
-  local ok, vr = pcall(V.require, "VR")
+  local ok, vr = pcall(V.require, "vr/VR")
   return ok and vr and vr.enabled and vr.enabled() or false
 end
 

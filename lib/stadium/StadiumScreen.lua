@@ -369,7 +369,7 @@ function StadiumScreen.maybePush()
       -- point at it rather than reciting a path here: where a file dialog can
       -- be opened it opens one, and where it cannot it shows this same folder
       -- on screen -- which is the part a phone could not otherwise find out.
-      local okPick, pick = pcall(V.require, "StadiumRomPick")
+      local okPick, pick = pcall(V.require, "stadium/rom/StadiumRomPick")
       local label = (okPick and pick and pick.LABEL) or "STADIUM ROM"
       local how = (okPick and pick and pick.canDialog())
                   and "opens a file picker" or "says where to put one"

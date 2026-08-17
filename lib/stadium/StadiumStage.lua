@@ -272,7 +272,7 @@ end
 -- The two platforms this frame, as (side, matrix) -- shared by the camera's
 -- pass and the sun's, so the two can never disagree about where they are.
 local function each(arena, groundY, fn)
-  local ok, Stadium = pcall(V.require, "Stadium")
+  local ok, Stadium = pcall(V.require, "stadium/Stadium")
   for _, side in ipairs({ "enemy", "player" }) do
     local cell = arena[side]
     if cell then
