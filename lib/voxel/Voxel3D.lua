@@ -83,9 +83,9 @@ Voxel3D.FACE_SHADE = {
 
 -- Scene shader source (moved out of this file for readability).
 -- Loaded once; variants are built by prepending #defines.
-local SHADER = V.mod:read("lib/voxel/shaders/voxel.glsl")
+local SHADER = V.mod:read("lib/shaders/voxel.glsl")
 if not SHADER then
-  error("DRAMATIC_SHAPE: lib/voxel/shaders/voxel.glsl is missing -- reinstall the mod", 0)
+  error("DRAMATIC_SHAPE: lib/shaders/voxel.glsl is missing -- reinstall the mod", 0)
 end
 
 -- Compilations of SHADER, by what is compiled INTO it: the voxel
