@@ -56,31 +56,10 @@ BattleDOF.SPACING = 0.0095
 -- little richer than the sharp subject in front of it.
 BattleDOF.SATURATION = 1.12
 
-local SHADER = [[
-  uniform vec2 dir;        // one texel step along the axis being blurred
-  uniform float focusY;
-  uniform float band;
-  uniform float range;
-  uniform float spacing;
-  uniform float boost;     // 0 = plain blur pass, 1 = final pass (colour pop)
-  uniform float saturation;
-  vec4 effect(vec4 color, Image tex, vec2 tc, vec2 sc) {
-    float d = abs(tc.y - focusY) - band;
-    float s = clamp(d / range, 0.0, 1.0);
-    s = s * s;             // ease in, so the band edge has no visible seam
-    vec2 o = dir * (s * spacing);
-    vec4 sum = Texel(tex, tc) * 0.2270270270;
-    sum += (Texel(tex, tc + o) + Texel(tex, tc - o)) * 0.1945945946;
-    sum += (Texel(tex, tc + 2.0 * o) + Texel(tex, tc - 2.0 * o)) * 0.1216216216;
-    sum += (Texel(tex, tc + 3.0 * o) + Texel(tex, tc - 3.0 * o)) * 0.0540540541;
-    sum += (Texel(tex, tc + 4.0 * o) + Texel(tex, tc - 4.0 * o)) * 0.0162162162;
-    if (boost > 0.5) {
-      float luma = dot(sum.rgb, vec3(0.299, 0.587, 0.114));
-      sum.rgb = mix(vec3(luma), sum.rgb, saturation);
-    }
-    return sum * color;
-  }
-]]
+local SHADER = V.mod:read("lib/shaders/battle_dof.glsl")
+if not SHADER then
+  error("DRAMATIC_SHAPE: lib/shaders/battle_dof.glsl is missing -- reinstall the mod", 0)
+end
 
 local shader = nil            -- nil = untried, false = unavailable
 local ping, pong, cw, ch = nil, nil, 0, 0
