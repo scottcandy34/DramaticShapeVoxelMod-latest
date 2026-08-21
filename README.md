@@ -167,6 +167,12 @@ engine already asks you to supply the Game Boy ROM it is a recompilation of.
 > The reference dump is **md5 `ed1378bc12115f71209a77844965ba50`**, 32 MB.
 > The mod does not tell you where to get one, and none ships with it.
 
+**Any of these work:**
+
+0. **Launcher import (recommended on current Gen1Recomp)** — in the mod
+   manager, open this mod’s **Imported files** action and select the ROM.
+   The launcher validates the MD5 and keeps a private copy as
+   `baseroms/baserom.z64` under this mod.
 1. Open **OPTIONS** and press the **STADIUM ROM** row. It opens your system's
    file picker; choose your **Pokémon Stadium (US) 1.0** ROM. `.z64`, `.n64`
    and `.v64` all work — the byte order is detected, and the wrong file is
@@ -174,19 +180,18 @@ engine already asks you to supply the Game Boy ROM it is a recompilation of.
 2. The 151 models are built on a loading screen that says so and shows a
    progress bar, in about ten seconds. The row then reads **READY**.
 
-The ROM itself is **not kept** — it is read, built from, and forgotten, so
-the cartridge does not sit in your save directory alongside the models it
-produced. Press the row again any time to import a different one.
+With the in-game picker, the ROM itself is **not kept** after the build —
+it is read, built from, and forgotten. Press the row again any time to
+import a different one. A launcher import (or a file you place yourself)
+stays under this mod’s `baseroms/` folder.
 
 There is no picker on Android, or on a Linux install with neither `zenity`
-nor `kdialog`. Those keep the original route, which still works everywhere:
+nor `kdialog`. Those keep the drop-in route, which still works everywhere:
 
-- Put the **US 1.0** ROM in a `baseroms/` folder beside the game — straight
-  in it, not in a subfolder — and start the game.
-- In a packaged build (and on Android) `baseroms/` goes in the save
-  directory; the mod logs the exact path on startup when it cannot find one.
-  On Android that is the app's external-files folder, reachable over USB or
-  any file manager without root.
+- Put the **US 1.0** ROM in this mod’s **`baseroms/`** folder — straight
+  in it, not in a subfolder — as `baserom.z64` (or `.n64` / `.v64`).
+- Or use the launcher **Imported files** action above (works on every
+  platform the launcher supports).
 
 Either way, the two STADIUM rungs appear on the 3D-BTL row when it's done.
 

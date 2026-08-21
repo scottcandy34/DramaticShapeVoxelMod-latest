@@ -2,6 +2,15 @@
 
 ## 1.9.0 — 2026-08-21
 
+### Added
+- **Launcher Stadium ROM import** via manifest `optional_imports` (same
+  pattern as StadiumBattleFX): Pokemon Stadium (USA) v1.0 under this mod’s
+  **Imported files**. MD5 `ed1378bc12115f71209a77844965ba50`. File is kept
+  as `baseroms/baserom.z64` at the mod root and read with `mod:read`.
+- ROM lookup is **`baseroms/` at the mod root only**. Existing in-game
+  **STADIUM ROM** picker and drop-in of `baserom.z64` / `.n64` / `.v64` in
+  that folder still work.
+
 ### Changed
 - **VR removed from this package.** OpenXR / PCVR support now lives in the
   companion mod [**VoxelVR**](https://github.com/scottcandy34/VoxelVR)

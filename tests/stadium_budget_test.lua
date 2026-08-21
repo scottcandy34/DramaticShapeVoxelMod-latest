@@ -33,7 +33,7 @@ for _, a in ipairs({ ... }) do
 end
 
 local MOD = "mods/DramaticShapeVoxelMod"
-local ROM = args.rom or (MOD .. "/model_extract/baseroms/us/baserom.z64")
+local ROM = args.rom or (MOD .. "/baseroms/baserom.z64")
 
 -- How much headroom the whole build may take on top of the ROM, in MB. Sized
 -- against the smallest thing this is expected to run on rather than against

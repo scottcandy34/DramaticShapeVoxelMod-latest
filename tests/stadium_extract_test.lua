@@ -36,7 +36,7 @@ for _, a in ipairs({ ... }) do
 end
 
 local MOD = args.mod or "mods/DramaticShapeVoxelMod"
-local ROM = args.rom or (MOD .. "/model_extract/baseroms/us/baserom.z64")
+local ROM = args.rom or (MOD .. "/baseroms/baserom.z64")
 local ORACLE = args.oracle or (MOD .. "/assets/stadium")
 
 -- ------- the mod namespace, enough of it to load four modules

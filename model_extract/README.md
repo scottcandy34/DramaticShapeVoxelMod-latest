@@ -21,8 +21,8 @@ splat, no crunch64:
 model_extract/pipeline/build.py
 ```
 
-Put a US 1.0 ROM in [baseroms/](baseroms/) (`.z64`, `.n64` or `.v64`), or pass
-`--rom=PATH`. See [pipeline/README.md](pipeline/README.md) for the module layout,
+Put a US 1.0 ROM in the **mod-root** [`baseroms/`](../baseroms/) folder
+(`baseroms/baserom.z64`), or pass `--rom=PATH`. `model_extract/baseroms/` is a deprecated fallback only. See [pipeline/README.md](pipeline/README.md) for the module layout,
 how the ROM is unpacked, and the generated-effects notes.
 
 ```

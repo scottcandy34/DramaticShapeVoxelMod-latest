@@ -1,25 +1,17 @@
-# Put the ROM here
+# Deprecated drop path
 
-`pipeline/build.py` looks for a Pokemon Stadium (US 1.0) ROM in this folder:
+**Player and in-game ROM location is the mod-root folder:**
 
-    model_extract/baseroms/baserom.z64
+    baseroms/baserom.z64
 
-`.z64`, `.n64` and `.v64` byte orders are all accepted — the pipeline detects the
-magic and normalises on load. Any ROM file dropped in this folder is picked up.
+(not this directory).
 
-Expected md5 of the US 1.0 ROM: `ed1378bc12115f71209a77844965ba50`. A different
-ROM still runs, but the build prints a warning since the offsets are keyed to
-this revision.
+This folder remains only so older offline pipeline invocations and
+checkouts keep working. Prefer:
 
-Search order (first hit wins):
+    model_extract/pipeline/build.py --rom=../../baseroms/baserom.z64
 
-1. `model_extract/baseroms/baserom.z64`
-2. `model_extract/baseroms/us/baserom.z64`
-3. `baseroms/us/baserom.z64` at the repo root — the location `make init` uses
-4. any `*.z64` / `*.n64` / `*.v64` in this folder
+or place the ROM in the mod-root `baseroms/` folder (the pipeline searches
+there first when updated).
 
-Or point at one explicitly:
-
-    model_extract/pipeline/build.py --rom=/path/to/baserom.z64
-
-The ROM is not included and is not tracked by git.
+Expected MD5 (US 1.0): `ed1378bc12115f71209a77844965ba50`.

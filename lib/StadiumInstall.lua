@@ -6,8 +6,8 @@
 -- is exactly the arrangement this engine already has for the Game Boy ROM it
 -- is a recompilation of (src/import/RomImporter.lua).
 --
--- So: supply a Pokemon Stadium (US) 1.0 ROM -- the OPTIONS row opens a file
--- picker for one, or drop it in `baseroms/` -- and the first time the
+-- So: supply a Pokemon Stadium (US) 1.0 ROM -- launcher Imported files, the
+-- OPTIONS STADIUM ROM picker, or drop it in this mod's `baseroms/` -- and the first time the
 -- game runs with the mod on, the models are built. Once, on a loading screen,
 -- in about ten seconds. After that the packs sit in the save directory and
 -- the mod reads them like any other asset.
@@ -86,6 +86,23 @@ local NAMED = {
   StadiumInstall.ROM_DIR .. "/baserom.n64",
   StadiumInstall.ROM_DIR .. "/baserom.v64",
 }
+
+
+-- ROM lives only under this mod's baseroms/ (mod root).
+--   * Launcher optional_imports → baseroms/baserom.z64 via mod:read
+--   * Manual drop-in of baserom.z64 / .n64 / .v64 in the same folder
+--   * In-game STADIUM ROM picker still feeds beginFrom(bytes) as before
+local function readModBaserom()
+  local mod = V.mod
+  if not (mod and type(mod.read) == "function") then return nil end
+  for _, rel in ipairs(NAMED) do
+    local ok, bytes = pcall(function() return mod:read(rel) end)
+    if ok and type(bytes) == "string" and #bytes > 0 then
+      return bytes, rel
+    end
+  end
+  return nil
+end
 
 local function fs()
   -- Mods cannot touch love.filesystem (sandbox facade errors). The engine's
@@ -185,16 +202,15 @@ function StadiumInstall.romPath()
 end
 
 function StadiumInstall.romPresent()
+  if readModBaserom() then return true end
   return StadiumInstall.romPath() ~= nil
 end
 
 -- Where to tell the player to put it. The save directory is the answer that
 -- is always writable, and it is the one a packaged build needs.
 function StadiumInstall.romHint()
-  local f = fs()
-  local base = (f and f.getSaveDirectory and select(2, pcall(f.getSaveDirectory)))
-  if type(base) ~= "string" then base = "the game folder" end
-  return base .. "/" .. StadiumInstall.ROM_DIR
+  -- Files belong in this mod's baseroms/ only (launcher import or drop-in).
+  return "baseroms/ (mod root) — launcher Imported files, or drop baserom.z64 here"
 end
 
 -- The same thing with a FILENAME on the end, which is what a player actually
@@ -353,23 +369,30 @@ end
 -- Open the ROM found in `baseroms/` and start a stepped build. Returns false
 -- plus a reason when there is nothing to build from.
 function StadiumInstall.begin()
+  -- 1) Launcher optional_imports copy (sandbox-safe mod:read)
+  local bytes, label = readModBaserom()
+  if bytes then
+    return StadiumInstall.beginFrom(bytes, label)
+  end
+
+  -- 2) Legacy drop-in via save/game PhysFS path (dev / older installs)
   local f = fs()
   if not f then
-    if V.log then V.log:warn("StadiumInstall.begin: no filesystem") end
-    return false, "no filesystem"
+    if V.log then V.log:warn("StadiumInstall.begin: no ROM (import via launcher or place baserom.z64)") end
+    return false, "no ROM -- use MODS → Imported files for Pokemon Stadium (US) 1.0"
   end
   local path = StadiumInstall.romPath()
   if not path then
     if V.log then V.log:warn("StadiumInstall.begin: no ROM in %s", StadiumInstall.ROM_DIR) end
-    return false, "no ROM in " .. StadiumInstall.ROM_DIR
+    return false, "no ROM -- use MODS → Imported files for Pokemon Stadium (US) 1.0"
   end
 
-  local okRead, bytes = pcall(f.read, path)
-  if not (okRead and type(bytes) == "string") then
+  local okRead, fileBytes = pcall(f.read, path)
+  if not (okRead and type(fileBytes) == "string") then
     if V.log then V.log:warn("StadiumInstall.begin: could not read %s", tostring(path)) end
     return false, "could not read " .. path
   end
-  return StadiumInstall.beginFrom(bytes, path)
+  return StadiumInstall.beginFrom(fileBytes, path)
 end
 
 -- The same, from bytes somebody else has already got hold of -- which is the
