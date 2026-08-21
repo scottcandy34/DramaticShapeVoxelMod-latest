@@ -262,19 +262,19 @@ function CamControl.install()
     return math.max(-MOUSE_STEP, math.min(MOUSE_STEP, v or 0))
   end
   do
-    -- Assigning love.mousemoved is blocked by the mod sandbox; wrap the
-    -- Game method that main.lua routes the love callback into instead.
-    local inner = Game.mousemoved
-    function Game:mousemoved(x, y, dx, dy, istouch)
-      if battleLive() and not istouch then
-        -- dy is NEGATED for the same reason the stick's is: moving the
-        -- mouse away from you sends the camera up and over
-        if dx and dx ~= 0 then BattleCam.mouseOrbit(clamp(dx)) end
-        if dy and dy ~= 0 then BattleCam.mousePitch(-clamp(dy)) end
-        -- forwarded anyway: the cursor still has UI to point at, and the
-        -- steer is a read of the motion rather than a claim on it
-      end
-      if inner then return inner(self, x, y, dx, dy, istouch) end
+    -- Battle-camera mouse read rides the input.pointer hook (sandbox-safe).
+    local mod = V.mod
+    if mod and mod.hooks then
+      mod.hooks:wrap("input.pointer", function(next, game, evt)
+        if evt and evt.phase == "moved" and battleLive()
+           and evt.source ~= "touch" then
+          local dx, dy = evt.dx or 0, evt.dy or 0
+          if dx ~= 0 then BattleCam.mouseOrbit(clamp(dx)) end
+          if dy ~= 0 then BattleCam.mousePitch(-clamp(dy)) end
+          -- pass-through: cursor still has UI to point at
+        end
+        return next(game, evt)
+      end)
     end
   end
 

@@ -341,7 +341,7 @@ function ViewBox.frame(cx, cy, vw, vh, level)
     -- a zero band is a hard edge: half a pixel of ramp, which is one pixel
     -- of antialiasing rather than a stair (Diorama says the same)
     invFade = 1 / math.max(fade, 0.5),
-    kind = V.require("Diorama").BOX,
+    kind = (function() local ok,d=pcall(V.require,"Diorama"); return (ok and d and d.BOX) or "box" end)(),
   }
   return ViewBox.cull
 end

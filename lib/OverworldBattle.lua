@@ -54,7 +54,7 @@ local OverworldBattle = {}
 -- second, which is how the glyph flip is checked from a shot run. Read
 -- through pcall: the loader's sandbox does not hand a mod `os`, and a
 -- diagnostic must never be the reason the mod fails to load.
-local DEBUG = select(2, pcall(function() return os.getenv("DS_BATTLE_DEBUG") end))
+local DEBUG = false  -- os.getenv banned in sandbox; was DS_BATTLE_DEBUG
 if DEBUG == nil or DEBUG == false then DEBUG = nil end
 
 OverworldBattle.KEY = "battles"
@@ -730,7 +730,8 @@ function OverworldBattle.update(dt)
   -- pass draws it (the flat screen has the animations in-frame already)
   session.animTex = nil
   local okVR, vrOn = pcall(function()
-    local vr = V.require("VR")
+    local ok, vr = pcall(V.require, "VR")
+    if not (ok and vr) then return false end
     return vr.active and vr.active() or false
   end)
   if okVR and vrOn and session.battle then

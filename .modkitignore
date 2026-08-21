@@ -33,3 +33,15 @@ assets/docs/buidling_to_voxel/voxel_build_verify.py
 # assets/docs/**.md stays in: data/voxel_heights.lua points a modder at the
 # building catalogue, and the methodology is where the geometry's provenance
 # is written down.
+
+# Offline Stadium extract pipeline (dev/oracle). Players use launcher import
+# or mod-root baseroms/; this code is not needed at runtime.
+model_extract/README.md
+model_extract/baseroms/README.md
+model_extract/pipeline/README.md
+model_extract/pipeline/battle.py
+model_extract/pipeline/build.py
+model_extract/pipeline/effects.py
+model_extract/pipeline/fragment.py
+model_extract/pipeline/glb.py
+model_extract/pipeline/rom.py

@@ -80,10 +80,6 @@ SettingsMenu.CATEGORIES = {
   { id = "perf", label = "PERFORMANCE..",
     help = "What the look costs -- the three most expensive things in the "
       .. "frame after the geometry itself." },
-  { id = "vr", label = "VR..",
-    summary = function() return V.require("VR").setting:valueLabel() end,
-    help = "PCVR through OpenXR, and the one comfort setting that belongs to "
-      .. "the headset alone." },
 }
 
 -- ------- help for the rows that are not settings

@@ -264,15 +264,11 @@ end
 -- that quietly goes on saying IMPORT.
 -- Paths checked (in order) when the player presses STADIUM ROM.
 -- Relative paths under the mod are read via mod:read.
+-- Only this mod's baseroms/ at the package root (launcher + drop-in).
 local CANDIDATE_MOD_ROMS = {
-  "model_extract/baseroms/baserom.z64",
-  "model_extract/baseroms/baserom.n64",
-  "model_extract/baseroms/baserom.v64",
-  "model_extract/baseroms/us/baserom.z64",
   "baseroms/baserom.z64",
   "baseroms/baserom.n64",
   "baseroms/baserom.v64",
-  "baseroms/us/baserom.z64",
 }
 
 -- Also try these on the engine save/source FS (mods/<id>/...).
@@ -282,10 +278,6 @@ local function candidateFsRoms(modId)
   for _, rel in ipairs(CANDIDATE_MOD_ROMS) do
     out[#out + 1] = "mods/" .. id .. "/" .. rel
   end
-  -- bare save-dir baseroms
-  out[#out + 1] = "baseroms/baserom.z64"
-  out[#out + 1] = "baseroms/baserom.n64"
-  out[#out + 1] = "baseroms/baserom.v64"
   return out
 end
 
@@ -324,7 +316,7 @@ local function tryDirectoryRom(game)
 
   -- Probe directory listing so logs show whether the folder is visible.
   if mod and mod.list then
-    for _, dir in ipairs({ "model_extract/baseroms", "model_extract", "baseroms" }) do
+    for _, dir in ipairs({ "baseroms" }) do
       local okL, items = pcall(mod.list, mod, dir)
       if okL and type(items) == "table" then
         dlog("mod:list %s -> %d entries: %s", dir, #items, table.concat(items, ", "):sub(1, 120))
@@ -354,12 +346,7 @@ local function tryDirectoryRom(game)
     end
     -- Scan directories for any stadium-sized ROM the player dropped in.
     if mod.list then
-      for _, dir in ipairs({
-        "model_extract/baseroms",
-        "model_extract/baseroms/us",
-        "baseroms",
-        "baseroms/us",
-      }) do
+      for _, dir in ipairs({ "baseroms" }) do
         local okL, items = pcall(mod.list, mod, dir)
         if okL and type(items) == "table" then
           for _, name in ipairs(items) do
@@ -454,7 +441,7 @@ function StadiumRomPick.import(game)
     tostring(platform), tostring(haveShell()), tostring(haveFiles()),
     tostring(game ~= nil), tostring(game and game.stack ~= nil))
 
-  -- Prefer an on-disk ROM (mod model_extract/baseroms or save-dir baseroms)
+  -- Prefer an on-disk ROM in this mod's baseroms/
   -- so a single click imports without needing drag-and-drop.
   if tryDirectoryRom(game) then
     dlog("import: started from directory ROM")
@@ -473,7 +460,7 @@ function StadiumRomPick.import(game)
     end
     dlog("mobile path: no pickFile, using folder hint")
     pushNote("STADIUM ROM", "PUT ROM HERE",
-      "model_extract/baseroms/baserom.z64")
+      "baseroms/baserom.z64")
     return false
   end
 
@@ -482,7 +469,7 @@ function StadiumRomPick.import(game)
   -- press STADIUM ROM again to auto-load it.
   dlog("desktop/unknown: prompting for file drop / directory")
   pushNote("STADIUM ROM", "DROP ROM ON WINDOW",
-    "or: model_extract/baseroms/baserom.z64")
+    "or: baseroms/baserom.z64")
   return true
 end
 

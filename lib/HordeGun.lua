@@ -32,7 +32,20 @@ local V = ...
 
 local Mat4 = V.require("Mat4")
 local Voxel3D = V.require("Voxel3D")
-local VRRig = V.require("VRRig")
+-- VR companion (VOXEL_VR) may supply VRRig; without it the gun
+-- stays on the flat-screen view-model path only.
+local function getVRRig()
+  local ok, mod = pcall(V.require, "VRRig")
+  if ok and mod then return mod end
+  ok, mod = pcall(function()
+    local m = V.mod and V.mod.find and V.mod.find("VOXEL_VR")
+    if m and m.exports and m.exports.lib then
+      return m.exports.lib.require("VRRig")
+    end
+  end)
+  if ok then return mod end
+  return nil
+end
 local FirstPerson = V.require("FirstPerson")
 local Horde = V.require("Horde")
 local HordeSfx = V.require("HordeSfx")
@@ -405,6 +418,8 @@ end
 -- the tracked right hand -- the runtime's aim pose where it has one.
 
 function HordeGun.place(pose, pivot, anchor, scale, yaw)
+  local VRRig = getVRRig()
+  if not VRRig then return end
   if not (Horde.active and pose) then
     HordeGun.clear()
     return
@@ -481,7 +496,7 @@ local function flatModel()
   local m = Mat4.translate(eye[1], eye[2], eye[3])
   m = Mat4.mul(m, Mat4.rotateY(FirstPerson.yaw))
   m = Mat4.mul(m, Mat4.rotateX(FirstPerson.pitch - 0.34 * k))
-  m = Mat4.mul(m, Mat4.scale(VRRig.FP_SCALE, VRRig.FP_SCALE, VRRig.FP_SCALE))
+  m = Mat4.mul(m, Mat4.scale(1, 1, 1))
   m = Mat4.mul(m, Mat4.translate(ox, oy, oz))
   if gun.reloading then
     local t = math.min(1, gun.reloadT / HordeGun.RELOAD_TIME)

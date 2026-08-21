@@ -782,7 +782,7 @@ end
 -- is how "nothing is on screen" gets told apart from "nothing was asked
 -- for". Read through pcall: the loader's sandbox does not hand a mod `os`,
 -- and a diagnostic must never be why the mod fails to load.
-local DEBUG = select(2, pcall(function() return os.getenv("DS_STADIUM_DEBUG") end))
+local DEBUG = false  -- os.getenv banned in sandbox; was DS_STADIUM_DEBUG
 if DEBUG == nil or DEBUG == false then DEBUG = nil end
 
 local debugAt = 0

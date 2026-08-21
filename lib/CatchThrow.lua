@@ -1351,41 +1351,32 @@ function CatchThrow.installInput()
 
   -- ------- mouse
   --
-  -- Installed after CamControl's wraps (see main.lua's install order), so
-  -- these are the OUTER ones and the aim owns the button first. Bare
+  -- Sandbox-safe: ride input.pointer instead of Game:mouse* wraps.
+  -- Installed after CamControl so aim owns the button first. Bare
   -- motion is not claimed -- CamControl's battle steer already stands
   -- down while the capture holds the camera (BattleCam.steerable).
-  -- Assigning love.* callbacks is blocked by the mod sandbox; wrap the
-  -- Game methods that main.lua routes those callbacks into instead.
   do
-    local inner = Game.mousepressed
-    function Game:mousepressed(x, y, button, istouch, presses)
-      if aiming() and not istouch and button == 1 then
-        pointer("press", x, y, "mouse")
-        return
-      end
-      if inner then return inner(self, x, y, button, istouch, presses) end
-    end
-  end
-  do
-    local inner = Game.mousemoved
-    function Game:mousemoved(x, y, dx, dy, istouch)
-      if aiming() and not istouch and S.grab and S.grab.id == "mouse" then
-        pointer("move", x, y, "mouse")
-        return
-      end
-      if inner then return inner(self, x, y, dx, dy, istouch) end
-    end
-  end
-  do
-    local inner = Game.mousereleased
-    function Game:mousereleased(x, y, button, istouch, presses)
-      if aiming() and not istouch and button == 1
-         and S.grab and S.grab.id == "mouse" then
-        pointer("release", x, y, "mouse")
-        return
-      end
-      if inner then return inner(self, x, y, button, istouch, presses) end
+    local mod = V.mod
+    if mod and mod.hooks then
+      mod.hooks:wrap("input.pointer", function(next, game, evt)
+        if not evt or evt.source == "touch" then
+          return next(game, evt)
+        end
+        local x, y = evt.x, evt.y
+        if evt.phase == "pressed" and aiming() and evt.button == 1 then
+          pointer("press", x, y, "mouse")
+          return true
+        elseif evt.phase == "moved" and aiming()
+               and S.grab and S.grab.id == "mouse" then
+          pointer("move", x, y, "mouse")
+          return true
+        elseif evt.phase == "released" and aiming() and evt.button == 1
+               and S.grab and S.grab.id == "mouse" then
+          pointer("release", x, y, "mouse")
+          return true
+        end
+        return next(game, evt)
+      end)
     end
   end
 

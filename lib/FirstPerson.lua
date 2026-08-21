@@ -509,14 +509,22 @@ function FirstPerson.update(dt)
   -- the live mode rather than toggled on edges, so a capture lost to the
   -- OS (alt-tab) re-arms itself on the next focused frame.
   local wantCapture = engagedNow
-  if wantCapture and love.window and love.window.hasFocus then
-    local okF, focus = pcall(love.window.hasFocus)
-    wantCapture = okF and focus or false
+  if wantCapture then
+    local okW, win = pcall(function() return love and love.window end)
+    if okW and win and win.hasFocus then
+      local okF, focus = pcall(win.hasFocus)
+      wantCapture = okF and focus or false
+    end
   end
-  if love.mouse and love.mouse.setRelativeMode then
-    local okM, isRel = pcall(love.mouse.getRelativeMode)
-    if okM and isRel ~= wantCapture then
-      pcall(love.mouse.setRelativeMode, wantCapture)
+  -- love.mouse is not a sanctioned mod surface; relative mode is best-effort.
+  -- Capture state still drives look via input.pointer regardless.
+  do
+    local ok, mouse = pcall(function() return love and love.mouse end)
+    if ok and mouse and mouse.setRelativeMode then
+      local okM, isRel = pcall(mouse.getRelativeMode)
+      if okM and isRel ~= wantCapture then
+        pcall(mouse.setRelativeMode, wantCapture)
+      end
     end
     captured = wantCapture
   end
@@ -743,20 +751,23 @@ function FirstPerson.install()
 
   -- ------- mouse
   --
-  -- Wrap Game:mousemoved / mousepressed / mousereleased (the engine now
-  -- has these methods and main.lua routes the love callbacks into them).
-  -- Assigning love.mousemoved etc. is blocked by the mod sandbox.
-  -- Claimed only while captured; pass-through otherwise, including the
-  -- mouse-as-touch path.
+  -- The sandbox forbids assigning the engine's love callbacks, so the
+  -- mouse read rides the engine's input.pointer hook -- the seam that
+  -- sees every pointer event with the same relative counts the old
+  -- love.mousemoved callback carried. Claimed only while captured;
+  -- pass-through otherwise.
   do
-    local inner = Game.mousemoved
-    function Game:mousemoved(x, y, dx, dy, istouch)
-      if captured and not istouch then
-        mouseDX = mouseDX + (dx or 0)
-        mouseDY = mouseDY + (dy or 0)
-        return
-      end
-      if inner then return inner(self, x, y, dx, dy, istouch) end
+    local mod = V.mod
+    if mod and mod.hooks then
+      mod.hooks:wrap("input.pointer", function(next, game, evt)
+        if evt and evt.phase == "moved" and captured
+           and evt.source ~= "touch" then
+          mouseDX = mouseDX + (evt.dx or 0)
+          mouseDY = mouseDY + (evt.dy or 0)
+          return true
+        end
+        return next(game, evt)
+      end)
     end
   end
   -- While the mouse is captured there is no cursor to click UI with, so
@@ -786,31 +797,34 @@ function FirstPerson.install()
     return false
   end
   do
-    local inner = Game.mousepressed
-    function Game:mousepressed(x, y, button, istouch, presses)
-      if captured and not istouch and hordeMouse(button, true) then return end
-      if captured and not istouch and MOUSE_BTN[button] then
-        local Input = require("src.core.Input")
-        mouseHeld[button] = true
-        Input:overlayPressed(MOUSE_BTN[button])
-        return
-      end
-      if inner then return inner(self, x, y, button, istouch, presses) end
-    end
-  end
-  do
-    local inner = Game.mousereleased
-    function Game:mousereleased(x, y, button, istouch, presses)
-      -- a release always reaches whoever owns the press: the horde's
-      -- aim-hold has to let go even if the mode ended mid-click
-      if not mouseHeld[button] and hordeMouse(button, false) then return end
-      if mouseHeld[button] then
-        local Input = require("src.core.Input")
-        mouseHeld[button] = nil
-        Input:overlayReleased(MOUSE_BTN[button])
-        return
-      end
-      if inner then return inner(self, x, y, button, istouch, presses) end
+    local mod = V.mod
+    if mod and mod.hooks then
+      mod.hooks:wrap("input.pointer", function(next, game, evt)
+        if not evt or evt.source == "touch" then
+          return next(game, evt)
+        end
+        local button = evt.button
+        if evt.phase == "pressed" then
+          if captured and hordeMouse(button, true) then return true end
+          if captured and MOUSE_BTN[button] then
+            local Input = require("src.core.Input")
+            mouseHeld[button] = true
+            Input:overlayPressed(MOUSE_BTN[button])
+            return true
+          end
+        elseif evt.phase == "released" then
+          if not mouseHeld[button] and hordeMouse(button, false) then
+            return true
+          end
+          if mouseHeld[button] then
+            local Input = require("src.core.Input")
+            mouseHeld[button] = nil
+            Input:overlayReleased(MOUSE_BTN[button])
+            return true
+          end
+        end
+        return next(game, evt)
+      end)
     end
   end
 

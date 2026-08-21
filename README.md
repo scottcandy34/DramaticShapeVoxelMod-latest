@@ -6,7 +6,31 @@ A mod for the [Pokémon Gen 1 Recompilation
 Project](https://github.com/bryanthaboi/pokemon-gen1-recomp-project).
 
 The overworld as a voxelized 3D diorama. Also supports experimental
-first-person, third-person and VR.
+first-person and third-person. Optional PCVR is a separate companion mod.
+
+
+## Optional PCVR (VoxelVR)
+
+Headset support is **not** bundled here. It lives in
+[**VoxelVR**](https://github.com/scottcandy34/VoxelVR) so this mod never
+loads LuaJIT FFI or an OpenXR loader (sandbox-safe / Android-friendly).
+
+### Install both
+
+1. Install this mod (**DRAMATIC_SHAPE** 1.9.0+).
+2. Import [VoxelVR 1.0.0](https://github.com/scottcandy34/VoxelVR) the same
+   way: **MODS → Import mod .zip**.
+3. Enable both. On Windows with an OpenXR runtime (SteamVR, Oculus, WMR, …)
+   a **VR** row appears on the OPTIONS menu.
+
+### Requirements for VR
+
+- Windows x64
+- OpenXR runtime + PCVR headset
+- This mod enabled (VoxelVR depends on it)
+
+Without VoxelVR, everything else in this mod works as usual.
+
 
 ## Controls
 
@@ -143,6 +167,12 @@ engine already asks you to supply the Game Boy ROM it is a recompilation of.
 > The reference dump is **md5 `ed1378bc12115f71209a77844965ba50`**, 32 MB.
 > The mod does not tell you where to get one, and none ships with it.
 
+**Any of these work:**
+
+0. **Launcher import (recommended on current Gen1Recomp)** — in the mod
+   manager, open this mod’s **Imported files** action and select the ROM.
+   The launcher validates the MD5 and keeps a private copy as
+   `baseroms/baserom.z64` under this mod.
 1. Open **OPTIONS** and press the **STADIUM ROM** row. It opens your system's
    file picker; choose your **Pokémon Stadium (US) 1.0** ROM. `.z64`, `.n64`
    and `.v64` all work — the byte order is detected, and the wrong file is
@@ -150,19 +180,18 @@ engine already asks you to supply the Game Boy ROM it is a recompilation of.
 2. The 151 models are built on a loading screen that says so and shows a
    progress bar, in about ten seconds. The row then reads **READY**.
 
-The ROM itself is **not kept** — it is read, built from, and forgotten, so
-the cartridge does not sit in your save directory alongside the models it
-produced. Press the row again any time to import a different one.
+With the in-game picker, the ROM itself is **not kept** after the build —
+it is read, built from, and forgotten. Press the row again any time to
+import a different one. A launcher import (or a file you place yourself)
+stays under this mod’s `baseroms/` folder.
 
 There is no picker on Android, or on a Linux install with neither `zenity`
-nor `kdialog`. Those keep the original route, which still works everywhere:
+nor `kdialog`. Those keep the drop-in route, which still works everywhere:
 
-- Put the **US 1.0** ROM in a `baseroms/` folder beside the game — straight
-  in it, not in a subfolder — and start the game.
-- In a packaged build (and on Android) `baseroms/` goes in the save
-  directory; the mod logs the exact path on startup when it cannot find one.
-  On Android that is the app's external-files folder, reachable over USB or
-  any file manager without root.
+- Put the **US 1.0** ROM in this mod’s **`baseroms/`** folder — straight
+  in it, not in a subfolder — as `baserom.z64` (or `.n64` / `.v64`).
+- Or use the launcher **Imported files** action above (works on every
+  platform the launcher supports).
 
 Either way, the two STADIUM rungs appear on the 3D-BTL row when it's done.
 
@@ -187,77 +216,12 @@ same ROM through `model_extract/pipeline`. That path is also the *oracle*:
 the same cartridge and requires all 151 packed files to come out byte for byte
 identical.
 
-## VR
-
-The **VR** options row (OFF / STANDARD / DIORAMA / DIORAMA-MR, off by
-default) drives a PCVR headset through OpenXR on Windows — SteamVR,
-Oculus or WMR.
-
-**STANDARD** follows the VOXEL ladder. Both free-roam rungs put the
-headset in the player's *head*: a boom that seats its wearer three cells
-behind their own body is a reliable way to make people ill, so **3RD** in
-VR is **1ST** in VR. The rung still changes the walk and the sprites the
-same way.
-
-### DIORAMA
-
-**DIORAMA** is one presentation instead of a ladder: the world is always a
-model on the table, and the model is a *thing in the room*.
-
-- **A viewport.** Everything outside an invisible **box** centred on the
-  view is not drawn — a square slab of Kanto sitting in the air rather
-  than a map running off to a horizon, cut with a hard edge, because a
-  flat world is a thing with sides and the sides are what say so. The sky
-  behind is the same one the flat screen has.
-- **V-CURVE changes its shape.** With the bend on the world is not flat
-  any more, and a square cut through a little globe is a lie about what is
-  being looked at — so the box becomes a **ball** whose rim is a
-  **gradient** dissolving into the sky. One click of the left stick throws
-  the row and swaps between the two readings of the same model.
-- **A staged fight** ignores both and cuts a vertical pillar about the
-  arena, always with the dissolved rim, which lifts the fight out of the
-  map as a floating disc.
-- **The grips** take hold of it: one hand carries the model anywhere in
-  the room, both hands turn it and open the viewport out to whatever you
-  spread your hands to.
-- **The left stick's click** throws **V-CURVE** to its top rung and back,
-  rather than stepping views — there is no 2D diorama and no first-person
-  one, so the ladder is held on an orbit rung while the mode runs.
-
-**DIORAMA-MR** is the same mode with the background keyed pure green, for
-a mixed-reality capture that composites the model into your own room.
-
-### VR controls
-
-Suggested onto Touch, Index and WMR controllers (rebindable in the
-runtime's own binding UI); pad, keyboard and mouse all keep working
-alongside.
-
-| control | does |
-| --- | --- |
-| left stick | move — grid-walks the diorama, free-walks 1ST |
-| A / B (X / Y on the left hand) | A / B |
-| either trigger | START |
-| left stick click | *STANDARD* — step the VOXEL angle ladder (same as the "3" key); *DIORAMA* — throw **V-CURVE** to its top rung and back |
-| right stick up / down | *tabletop* — zoom the model |
-| right stick left / right | *1ST only* — snap-turn 45°, or turn smoothly with **SMOOTH TURN** on |
-| one grip squeezed | *STANDARD* — drag the table's height; *DIORAMA* — carry the model wherever that hand goes |
-| both grips squeezed | *DIORAMA only* — turn the model with your hands, and open or close the viewport by spreading them |
-| head | *1ST and battles* — look; FreeMove walks where you look |
-| left hand | *1ST and battles* — the Pokédex: menus, dialogs and the 2D battle screen on its screen |
 
 ## Licenses
 
 It redistributes one third-party binary:
 
-- **`assets/vr/openxr_loader.dll`** — the Khronos OpenXR loader
-  (version 1.0.10.2, x64, unmodified), © The Khronos Group Inc.,
-  licensed under the **Apache License 2.0**. The full license text ships
-  alongside the DLL at
-  [`assets/vr/LICENSE-openxr_loader.txt`](assets/vr/LICENSE-openxr_loader.txt),
-  as the license requires; keep the two files together if you
-  redistribute this mod. Source:
-  [KhronosGroup/OpenXR-SDK](https://github.com/KhronosGroup/OpenXR-SDK).
+
 
 Everything else in this mod is original to it, except that the voxel
 geometry and shape profiles are derived from the tile and sprite data of

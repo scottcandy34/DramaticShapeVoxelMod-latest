@@ -1,0 +1,6 @@
+baserom.z64
+*.z64
+*.n64
+*.v64
+*:Zone.Identifier
+*.validated

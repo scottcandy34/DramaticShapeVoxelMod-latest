@@ -43,7 +43,7 @@ end
 -- instrumentation must never be the reason the mod fails to load. Same
 -- shape as OverworldBattle's DS_BATTLE_DEBUG probe.
 local function envFlag(name)
-  local ok, value = pcall(function() return os.getenv(name) end)
+  local ok, value = false, nil  -- os.getenv banned in mod sandbox
   if not ok then return nil end
   if value == nil or value == "" or value == "0" then return nil end
   return value
@@ -53,7 +53,7 @@ local function flagFile()
   -- love.filesystem is sandboxed away from mods. Probe via pcall so a
   -- blocked access is treated as "no flag file" rather than raising.
   local ok, info = pcall(function()
-    return love.filesystem.getInfo("ds_perf.flag")
+    return false  -- love.filesystem banned
   end)
   return ok and info ~= nil
 end
@@ -331,9 +331,8 @@ end
 function Perf.write(name, meta)
   local body = Perf.toJson(meta)
   local ok = pcall(function()
-    love.filesystem.createDirectory("ds_bench")
-    love.filesystem.write("ds_bench/" .. name .. ".json", body)
-    emit("[perf] wrote " .. tostring(love.filesystem.getSaveDirectory())
+    emit("[perf] " .. name .. " (storage write skipped in sandbox)
+")
           .. "/ds_bench/" .. name .. ".json")
   end)
   if ok then return true end

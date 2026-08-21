@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.9.0 — 2026-08-21
+
+### Added
+- **Launcher Stadium ROM import** via manifest `optional_imports` (same
+  pattern as StadiumBattleFX): Pokemon Stadium (USA) v1.0 under this mod’s
+  **Imported files**. MD5 `ed1378bc12115f71209a77844965ba50`. File is kept
+  as `baseroms/baserom.z64` at the mod root and read with `mod:read`.
+- ROM lookup is **`baseroms/` at the mod root only**. Existing in-game
+  **STADIUM ROM** picker and drop-in of `baserom.z64` / `.n64` / `.v64` in
+  that folder still work.
+
+### Changed
+- **VR removed from this package.** OpenXR / PCVR support now lives in the
+  companion mod [**VoxelVR**](https://github.com/scottcandy34/VoxelVR)
+  (`id`: `VoxelVR`). This mod no longer loads LuaJIT FFI or ships
+  `openxr_loader.dll`, so it stays sandbox-safe and works on Android.
+- Soft hooks remain for when VoxelVR is installed: desk-window mirror,
+  invalidate, and lazy resolve of `Pokedex` / `Diorama` / `VRRig`.
+- Exports for the companion: `cycleVoxel`, `setVoxelLevel`, `registerVR`,
+  `vrCompanion`, and `lib`.
+- **Sandbox surfaces aligned with Gen1Recomp mod sandbox** (same class of
+  fixes as potato_voxel / DRAMALESS forks):
+  - **No FFI** — `ChunkMesher` table-sink only; `require("ffi")` removed
+  - Mouse / look use sanctioned **`input.pointer`** hooks (`FirstPerson`,
+    `CamControl`, `CatchThrow`) instead of `Game:mouse*` / love callbacks
+  - `os.getenv` debug flags removed; perf flag no longer probes
+    `love.filesystem`
+  - Android detection via `src.core.Platform` when available, not
+    `love.system`
+
+### Removed
+- `lib/VR.lua`, `VRGL.lua`, `VRXR.lua`, `VRRig.lua`, `Diorama.lua`, `Pokedex.lua`
+- `assets/vr/` (loader DLL)
+- VR category and rows from the OPTIONS menu (restored by VoxelVR when present)
+- Hard `V.require` of any VR module
+- FFI mesh sink in `ChunkMesher`
+
+### Migration
+1. Update this mod to 1.9.0.
+2. Install [VoxelVR 1.0.0](https://github.com/scottcandy34/VoxelVR) if you
+   want headset support (Windows + OpenXR only).
+3. Enable both mods. The **VR** row appears on OPTIONS when a runtime is
+   available.
+
 ## 1.8.5
 
 ### Added

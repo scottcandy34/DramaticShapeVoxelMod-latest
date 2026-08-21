@@ -1,7 +1,7 @@
 {
   "id": "DRAMATIC_SHAPE",
   "name": "Dramatic Shape Voxel Mod",
-  "version": "1.8.5",
+  "version": "1.9.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -9,7 +9,9 @@
   "game_version": "0.0.0-dev || >=0.1.37 <2.0.0",
   "priority": 100,
   "dependencies": [],
-  "optional_dependencies": [],
+  "optional_dependencies": [
+    "VOXEL_VR"
+  ],
   "conflicts": [
     "ds_fp_ceiling"
   ],
@@ -17,6 +19,16 @@
     "engine_internals"
   ],
   "affects_link": false,
-  "description": "Draws the overworld as a 3D diorama.",
-  "github": "scottcandy34/DramaticShapeVoxelMod-latest"
+  "description": "Draws the overworld as a 3D diorama. Optional PCVR via VoxelVR. Optional Stadium ROM (baseroms/) for 3D-BTL STADIUM models.",
+  "github": "scottcandy34/DramaticShapeVoxelMod-latest",
+  "optional_imports": [
+    {
+      "id": "stadium1_rom",
+      "name": "Pokemon Stadium (USA) v1.0 ROM",
+      "file": "baserom.z64",
+      "format": "n64",
+      "md5": "ed1378bc12115f71209a77844965ba50",
+      "description": "Optional: enables 3D-BTL STADIUM models. Pokemon Stadium (USA) v1.0, 32 MiB, MD5 ed1378bc12115f71209a77844965ba50. Stored as baseroms/baserom.z64 in this mod root. In-game STADIUM ROM picker still works."
+    }
+  ]
 }
