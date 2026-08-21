@@ -54,7 +54,7 @@ local OverworldBattle = {}
 -- second, which is how the glyph flip is checked from a shot run. Read
 -- through pcall: the loader's sandbox does not hand a mod `os`, and a
 -- diagnostic must never be the reason the mod fails to load.
-local DEBUG = select(2, pcall(function() return os.getenv("DS_BATTLE_DEBUG") end))
+local DEBUG = false  -- os.getenv banned in sandbox; was DS_BATTLE_DEBUG
 if DEBUG == nil or DEBUG == false then DEBUG = nil end
 
 OverworldBattle.KEY = "battles"

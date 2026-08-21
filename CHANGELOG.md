@@ -11,12 +11,22 @@
   invalidate, and lazy resolve of `Pokedex` / `Diorama` / `VRRig`.
 - Exports for the companion: `cycleVoxel`, `setVoxelLevel`, `registerVR`,
   `vrCompanion`, and `lib`.
+- **Sandbox surfaces aligned with Gen1Recomp mod sandbox** (same class of
+  fixes as potato_voxel / DRAMALESS forks):
+  - **No FFI** — `ChunkMesher` table-sink only; `require("ffi")` removed
+  - Mouse / look use sanctioned **`input.pointer`** hooks (`FirstPerson`,
+    `CamControl`, `CatchThrow`) instead of `Game:mouse*` / love callbacks
+  - `os.getenv` debug flags removed; perf flag no longer probes
+    `love.filesystem`
+  - Android detection via `src.core.Platform` when available, not
+    `love.system`
 
 ### Removed
 - `lib/VR.lua`, `VRGL.lua`, `VRXR.lua`, `VRRig.lua`, `Diorama.lua`, `Pokedex.lua`
 - `assets/vr/` (loader DLL)
 - VR category and rows from the OPTIONS menu (restored by VoxelVR when present)
 - Hard `V.require` of any VR module
+- FFI mesh sink in `ChunkMesher`
 
 ### Migration
 1. Update this mod to 1.9.0.

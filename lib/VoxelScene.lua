@@ -1,4 +1,4 @@
-﻿-- Voxel world mode: assemble and draw one frame of the 3D scene.
+-- Voxel world mode: assemble and draw one frame of the 3D scene.
 --
 -- World space is world pixels and shares its origin with the 2D paths, so
 -- the terrain mesh needs no transform at all and a connected map just
