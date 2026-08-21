@@ -27,8 +27,22 @@ local VoxelGrid = V.require("VoxelGrid")
 local DayNight = V.require("DayNight")
 local FirstPerson = V.require("FirstPerson")
 local BattleBillboard = V.require("BattleBillboard")
-local Pokedex = V.require("Pokedex")
-local Diorama = V.require("Diorama")
+-- Optional: supplied by the VOXEL_VR companion mod when installed.
+-- Resolved lazily so a companion loaded after this file still works.
+local function vrModule(name)
+  local ok, mod = pcall(V.require, name)
+  if ok and mod then return mod end
+  ok, mod = pcall(function()
+    local m = V.mod and V.mod.find and V.mod.find("VOXEL_VR")
+    if m and m.exports and m.exports.lib then
+      return m.exports.lib.require(name)
+    end
+  end)
+  if ok then return mod end
+  return nil
+end
+local function Pokedex() return vrModule("Pokedex") end
+local function Diorama() return vrModule("Diorama") end
 local ViewBox = V.require("ViewBox")
 local PaletteFX = require("src.render.PaletteFX")
 local Map = require("src.world.Map")
@@ -1030,9 +1044,10 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
   -- put back to nil at the end of this function, so no other pass in the
   -- frame -- the battle screen's own arena shot above all -- can inherit a
   -- cut world or a green background.
-  local dioFrame = (eyes and Diorama.on) and true or false
-  Voxel3D.cull = dioFrame and Diorama.cull or nil
-  Voxel3D.keyColor = dioFrame and Diorama.keyColor() or nil
+  local _dio = Diorama()
+  local dioFrame = (eyes and _dio and _dio.on) and true or false
+  Voxel3D.cull = dioFrame and _dio.cull or nil
+  Voxel3D.keyColor = dioFrame and _dio.keyColor() or nil
 
   local function atlasFor(map)
     return TerrainAtlas.forMap(map, modeColors(paletteFor, map))
@@ -1334,10 +1349,11 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
   -- the left hand is tracked (VR.lua sets it), so every flat frame skips
   -- this in one field read. No wireframe and no glass, like the cast:
   -- the device is a drawing riding the scene, not part of the terrain.
-  if Pokedex.frame then
+  local _dex = Pokedex()
+  if _dex and _dex.frame then
     Voxel3D.glass(false)
     Voxel3D.seams(false)
-    Pokedex.draw()
+    _dex.draw()
     Voxel3D.seams(true)
     Voxel3D.glass(true)
   end

@@ -46,6 +46,9 @@ local mod = ...
 
 local V = { mod = mod, path = mod.path }
 
+-- Filled by VOXEL_VR via mod.exports.registerVR
+local _vrCompanion = nil
+
 local function chunkFor(rel)
   local source = mod:read(rel)
   if not source then
@@ -104,7 +107,6 @@ local AntiAlias = V.require("AntiAlias")
 local FirstPerson = V.require("FirstPerson")
 local FreeMove = V.require("FreeMove")
 local CamControl = V.require("CamControl")
-local VR = V.require("VR")
 -- the mod's settings menus: the categories, the screens they open, and the
 -- red ink that marks this mod's one row on the engine's OPTIONS list
 local SettingsMenu = V.require("SettingsMenu")
@@ -347,13 +349,6 @@ mod.content.render_pipelines:register("voxel", {
     -- them announces it. Ahead of the active() gate, so switching it
     -- while voxel mode is OFF still invalidates what is cached.
     voidFill.check()
-    -- The whole VR frame -- session lifecycle, xrWaitFrame's pacing, both
-    -- eye renders, the layer submit -- rides this hook, because it is the
-    -- one tick that runs through menus, dialogs and battles, which is
-    -- what a headset needs the world (or at least the UI panel) to do.
-    -- Ahead of the active() gate: with the mode off, the headset still
-    -- shows the flat screen on the floating panel.
-    VR.update(dt)
     -- Android prepares large BODY meshes once on an opaque, resumable screen.
     -- Completion lives in persistent storage, so subsequent launches and
     -- ordinary traversal only stream bounded cache chunks. Keep this after
@@ -372,18 +367,26 @@ mod.content.render_pipelines:register("voxel", {
   end,
 
   drawWorld = function(ctx)
-    -- the palette closure, stashed for the VR frame: it renders from the
-    -- update hook, where no ctx exists to carry one
-    VR.paletteFor = ctx.paletteFor
-    -- With a headset running, the window's world pass becomes the MIRROR
-    -- -- the left eye, fitted to the window -- rather than a third full
-    -- render of the scene. Everything else about the frame (the UI the
-    -- engine composites over this) is unchanged, which is exactly what
-    -- the headset's floating panel photographs.
-    if VR.active() then
-      local sw, sh = sceneSize(ctx)
-      local m = VR.mirror(sw, sh)
-      if m then return m end
+    -- Soft VR companion hook: when VOXEL_VR is active, the window
+    -- shows the left-eye mirror instead of a third full render.
+    do
+      local vr = _vrCompanion
+      if not vr then
+        local ok, info = pcall(function() return mod.find("VOXEL_VR") end)
+        if ok and info and info.exports then vr = info.exports end
+      end
+      if vr then
+        pcall(function()
+          if vr.setPaletteFor then vr.setPaletteFor(ctx.paletteFor) end
+        end)
+        local active = false
+        pcall(function() active = vr.active and vr.active() end)
+        if active and vr.mirror then
+          local sw, sh = sceneSize(ctx)
+          local okM, m = pcall(vr.mirror, sw, sh)
+          if okM and m then return m end
+        end
+      end
     end
     -- Terrain and characters are geometry; the field FX stay ordinary 2D
     -- draws composited on top, anchored through the same camera the 3D
@@ -480,8 +483,7 @@ mod.content.render_pipelines:register("voxel", {
       -- ammunition, the crosshair and the banners, sized in the same
       -- supersampled canvas pixels everything else here is drawn in. A
       -- headset never reaches this line (drawWorld returns the mirror
-      -- above) -- lib/VR draws the same HUD onto each eye instead.
-      HordeHud.drawFlat(rw, rh, ctx.scale * AntiAlias.factor())
+            HordeHud.drawFlat(rw, rh, ctx.scale * AntiAlias.factor())
       Voxel3D.endOverlay()
     end
     -- and back to the window's own size, which is what the engine composites
@@ -495,8 +497,11 @@ mod.content.render_pipelines:register("voxel", {
     AntiAlias.invalidate()
     ChunkMesher.invalidate()   -- no map id = every cached mesh
     ForestAtmos.invalidate()   -- shaft/particle meshes and shader sentinels
-    VR.invalidate()            -- the mirror, and FBO ids of dead canvases
     Pokeball.invalidate()      -- the ball's meshes and palette texture
+    pcall(function()
+      local vr = _vrCompanion or (mod.find and mod.find("VOXEL_VR") and mod.find("VOXEL_VR").exports)
+      if vr and vr.invalidate then vr.invalidate() end
+    end)
   end,
 })
 
@@ -673,15 +678,10 @@ local SETTINGS = {
   --
   -- `full` marks a row FULL does not take away. FULL owns the diorama's own
   -- knobs; what a battle is drawn over, and how it is framed, are not that.
-  -- Off the OPTIONS menu while VR is on: the headset REQUIRES staged
-  -- battles (OverworldBattle.enabled answers true regardless of this row)
-  -- and forbids back sprites (backPinned answers false), so both rows
-  -- decide nothing there and a dead switch on the menu reads as broken.
   { OverworldBattle.setting,
     "Fights staged in 3D over your shoulder, on the map or on discs against "
     .. "the sky, as cards or Stadium's animated models.",
-    cat = "battles",
-    when = function() return not VR.enabled() end, full = true },
+    cat = "battles", full = true },
   -- Only offered while a fight can actually be staged on the map: with 3D-BTL
   -- off the engine draws the classic screen, which is this row's ON already,
   -- and a row that no longer decides anything is worse than no row.
@@ -689,7 +689,7 @@ local SETTINGS = {
     "Keeps your own Pokemon on the battle menu, seen from behind, instead "
     .. "of standing it on the map facing the foe.",
     cat = "battles",
-    when = function() return stagedBattles() and not VR.enabled() end,
+    when = function() return stagedBattles() end,
     full = true },
   -- `full` like the battle rows: this is a GAMEPLAY mode, not a knob on
   -- the diorama, so the FULL preset neither sets it nor takes it away.
@@ -724,43 +724,13 @@ local SETTINGS = {
     "Smooths the stair-stepped edges of the 3D world, and the most "
     .. "expensive row in the mod.",
     cat = "perf", full = true },
-
-  -- ------- VR -- the headset, and the one comfort knob that is only its
-  --
-  -- `full` for the same reason as AA: not a knob on the look, a question
-  -- about the hardware on the desk.
-  { VR.setting,
-    "PCVR through OpenXR on Windows, either following the VOXEL ladder or "
-    .. "as a DIORAMA you carry and turn with the grips.",
-    cat = "vr",
-    -- on Windows the row stays even when a runtime is missing (the console
-    -- says why); off Windows -- mobile above all -- there is no VR to have
-    -- and the row does not exist
-    when = function() return VR.supported() end, full = true },
-  -- Under the VR row and only while it is ON: a comfort setting for a
-  -- device that is not plugged in decides nothing, and this one is read
-  -- exclusively by the headset's right stick.
-  { VR.smoothTurn,
-    "Turns smoothly with the right stick instead of snapping 45 degrees, "
-    .. "if you have your sea legs for it.",
-    cat = "vr",
-    -- and only under STANDARD: the stick turns a HEAD, and neither diorama
-    -- mode has the player standing in the world to be turned
-    when = function() return VR.enabled() and not VR.dioramaMode() end,
-    full = true },
 }
 
 SettingsMenu.define(SETTINGS)
 
 local schema = {}
 for _, entry in ipairs(SETTINGS) do
-  -- the VR rows are absent from the mod manager's page too where the
-  -- platform cannot do VR at all -- the OPTIONS menu's `when` gates are
-  -- situational (a row hidden for now), this one is existential
-  local vrOnly = entry[1] == VR.setting or entry[1] == VR.smoothTurn
-  if not vrOnly or VR.supported() then
-    schema[#schema + 1] = entry[1]:schema(entry[2])
-  end
+  schema[#schema + 1] = entry[1]:schema(entry[2])
 end
 mod.options:define(schema)
 
@@ -815,8 +785,7 @@ local function cycleVoxel(game)
   local Pipelines = require("src.render.Pipelines")
   -- HORDE MODE holds the rung at 1ST for as long as it runs. Refused HERE
   -- rather than at each caller because this one function IS every way a
-  -- player can step the ladder: the "3" key, the pad's SELECT, and the VR
-  -- left-stick click all come through it.
+  -- player can step the ladder: the "3" key and the pad's SELECT.
   if Horde.viewLocked() then return false end
   local top = game.stack and game.stack:top()
   if not Pipelines.canToggle("voxel", top, game.overworld) then return false end
@@ -839,7 +808,7 @@ end
 
 -- The same, to a NAMED rung rather than one step on: what a diorama mode
 -- holds the ladder with, since 2D and both free-roam rungs are things it
--- cannot present (see VR.setVoxelLevel). Everything after the setLevel is
+-- cannot present. Everything after the setLevel is
 -- the engine work above, for the same reasons.
 local function setVoxelLevel(game, level)
   local Pipelines = require("src.render.Pipelines")
@@ -855,11 +824,6 @@ local function setVoxelLevel(game, level)
   return true
 end
 
--- The VR stick click makes this same step (VR.stepView): the function is
--- a local of this file, so the handoff is explicit rather than a
--- reimplementation drifting out of date in lib/VR.lua.
-VR.cycleVoxel = cycleVoxel
-VR.setVoxelLevel = setVoxelLevel
 
 do
   local Game = require("src.core.Game")
@@ -1255,13 +1219,12 @@ do
 
     -- What the row LIST depends on: whether FULL is selected (it owns the
     -- rows that describe the look), and the two switches that give and take
-    -- an engine row -- 3D-BTL, which owns BATTLE LAYOUT, and VR, which hides
-    -- both battle rows while it is on. Only the FULL-ness of the voxel level
+    -- an engine row -- 3D-BTL, which owns BATTLE LAYOUT. Only the FULL-ness of the voxel level
     -- matters, so stepping 35 to 50 is not a change.
     local function signature()
-      return string.format("%s|%s|%s",
-        tostring(Voxel.isFull(Pipelines.level("voxel"))),
-        tostring(OverworldBattle.enabled()), tostring(VR.enabled()))
+      return string.format("%s|%s",
+      tostring(Voxel.isFull(Pipelines.level("voxel"))),
+      tostring(OverworldBattle.enabled()))
     end
 
     -- Stamped where the ROWS are built, which is the thing the signature is a
@@ -1490,7 +1453,7 @@ end
 -- Installed last of the input seams so its handleInput reasoning sits
 -- outside FreeMove's and SELECT's. The detector itself does not live on
 -- handleInput at all -- it reads the fixed step's own press queue, which
--- is where keyboard, pad, touch and the VR controllers have all already
+-- is where keyboard, pad and touch have all already
 -- become the same eight buttons. See lib/Horde.lua.
 Horde.install()
 
@@ -1503,30 +1466,6 @@ Horde.install()
 -- safariAction) and the experience hooks install here too.
 LetsGo.install()
 
--- ------- edge-anchored menus stay in the GB frame while a headset is live
---
--- The engine's zoom-aware anchoring (Renderer:setUIAnchor) docks the START
--- menu to the WINDOW's top-right edge. Both VR screens -- the floating
--- panel and the Pokedex -- crop the window to the GB frame, so a menu at
--- the window's edge is cropped away with the border it docked to. The
--- engine's own answer to "a state composes its screen, keep every element
--- inside it" is uiAnchorHold, computed per frame from this predicate; a
--- live headset is exactly that situation for the WHOLE window, so the
--- predicate answers yes for as long as one is. Held menus blit where they
--- were drawn in the 160x144 canvas -- the START menu's 9,0 x 11 slot is
--- already flush with the frame's right edge, which is the right edge of
--- what the headset sees. Off-headset frames fall through untouched.
-do
-  local Game = require("src.core.Game")
-  if not Game.dramaticShapeAnchorHold then
-    local inner = Game.uiAnchorsHeldInStack
-    function Game.uiAnchorsHeldInStack(stack)
-      if VR.active() then return true end
-      return inner(stack)
-    end
-    Game.dramaticShapeAnchorHold = true
-  end
-end
 
 -- The overworld's own pushBattle is the choke point for a wild encounter or
 -- a trainer, and it is wrapped. A battle that arrives some other way -- a
@@ -1642,10 +1581,22 @@ mod.hooks:wrap("world.tod", function(next, tod, ctx)
   return DayNight.tod()
 end)
 
-mod.exports.version = "1.5.5"
+mod.exports.version = "1.9.0"
 -- exposed so a companion mod can pin its own tiles' shapes or read the
 -- camera without reaching into this mod's file layout
 mod.exports.lib = V
+-- Ladder helpers for the VOXEL_VR companion (was VR.cycleVoxel /
+-- VR.setVoxelLevel when VR lived in this package).
+mod.exports.cycleVoxel = cycleVoxel
+mod.exports.setVoxelLevel = setVoxelLevel
+-- Optional VR companion registration (VOXEL_VR calls this).
+function mod.exports.registerVR(exports)
+  _vrCompanion = exports
+  if V and V.dlog then V.dlog("VR companion registered") end
+end
+function mod.exports.vrCompanion()
+  return _vrCompanion
+end
 -- Diagnostic ring buffer (also under mod.storage key diagnostics/log).
 mod.exports.diagnosticLog = function()
   return V.log and V.log:contents() or ""

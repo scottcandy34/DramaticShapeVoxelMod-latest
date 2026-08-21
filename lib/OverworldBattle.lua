@@ -730,7 +730,8 @@ function OverworldBattle.update(dt)
   -- pass draws it (the flat screen has the animations in-frame already)
   session.animTex = nil
   local okVR, vrOn = pcall(function()
-    local vr = V.require("VR")
+    local ok, vr = pcall(V.require, "VR")
+    if not (ok and vr) then return false end
     return vr.active and vr.active() or false
   end)
   if okVR and vrOn and session.battle then

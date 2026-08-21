@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.9.0 — 2026-08-21
+
+### Changed
+- **VR removed from this package.** OpenXR / PCVR support now lives in the
+  companion mod [**VoxelVR**](https://github.com/scottcandy34/VoxelVR)
+  (`id`: `VoxelVR`). This mod no longer loads LuaJIT FFI or ships
+  `openxr_loader.dll`, so it stays sandbox-safe and works on Android.
+- Soft hooks remain for when VoxelVR is installed: desk-window mirror,
+  invalidate, and lazy resolve of `Pokedex` / `Diorama` / `VRRig`.
+- Exports for the companion: `cycleVoxel`, `setVoxelLevel`, `registerVR`,
+  `vrCompanion`, and `lib`.
+
+### Removed
+- `lib/VR.lua`, `VRGL.lua`, `VRXR.lua`, `VRRig.lua`, `Diorama.lua`, `Pokedex.lua`
+- `assets/vr/` (loader DLL)
+- VR category and rows from the OPTIONS menu (restored by VoxelVR when present)
+- Hard `V.require` of any VR module
+
+### Migration
+1. Update this mod to 1.9.0.
+2. Install [VoxelVR 1.0.0](https://github.com/scottcandy34/VoxelVR) if you
+   want headset support (Windows + OpenXR only).
+3. Enable both mods. The **VR** row appears on OPTIONS when a runtime is
+   available.
+
 ## 1.8.5
 
 ### Added

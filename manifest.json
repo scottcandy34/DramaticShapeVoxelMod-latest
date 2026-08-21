@@ -1,7 +1,7 @@
 {
   "id": "DRAMATIC_SHAPE",
   "name": "Dramatic Shape Voxel Mod",
-  "version": "1.8.5",
+  "version": "1.9.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -9,7 +9,9 @@
   "game_version": "0.0.0-dev || >=0.1.37 <2.0.0",
   "priority": 100,
   "dependencies": [],
-  "optional_dependencies": [],
+  "optional_dependencies": [
+    "VOXEL_VR"
+  ],
   "conflicts": [
     "ds_fp_ceiling"
   ],
@@ -17,6 +19,6 @@
     "engine_internals"
   ],
   "affects_link": false,
-  "description": "Draws the overworld as a 3D diorama.",
+  "description": "Draws the overworld as a 3D diorama. Optional PCVR via the VoxelVR companion mod.",
   "github": "scottcandy34/DramaticShapeVoxelMod-latest"
 }

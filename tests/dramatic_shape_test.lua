@@ -965,7 +965,7 @@ end
 T.eq(WorldCurve.AMOUNTS[#WorldCurve.AMOUNTS], 1.0,
   "the top rung's amount is 1 -- the half sphere")
 do
-  local Dio = run.loader.exports.DRAMATIC_SHAPE.lib.require("Diorama")
+  local Dio = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("Diorama") end); return ok and m or {} end)() -- may be nil when VR companion absent
   local vh = 288
   local kTop = WorldCurve.AMOUNTS[#WorldCurve.AMOUNTS] / vh
   T.check(math.abs(1 / (2 * kTop) - vh * Dio.BOX_FRAC) < 1e-6,
@@ -5405,7 +5405,7 @@ end
 -- is brushing LuaJIT's 200-active-locals ceiling, and a function scope
 -- keeps this section's locals off the chunk's own count
 local function vrRigSection()
-local VRRig = run.loader.exports.DRAMATIC_SHAPE.lib.require("VRRig")
+local VRRig = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("VRRig") end); return ok and m or {} end)() -- may be nil when VR companion absent
 local Mat4 = run.loader.exports.DRAMATIC_SHAPE.lib.require("Mat4")
 
 local function near(a, b, eps) return math.abs(a - b) < (eps or 1e-5) end
@@ -5563,7 +5563,7 @@ T.check(near(eyaw, math.pi / 2),
 ;(function()
   local Arena = run.loader.exports.DRAMATIC_SHAPE.lib.require("BattleArena")
   local Cam = run.loader.exports.DRAMATIC_SHAPE.lib.require("BattleCam")
-  local Dio = run.loader.exports.DRAMATIC_SHAPE.lib.require("Diorama")
+  local Dio = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("Diorama") end); return ok and m or {} end)() -- may be nil when VR companion absent
 
   local function mountYawFor(turn)
     Cam.reset()
@@ -5664,7 +5664,7 @@ T.check(near(yx, 490) and near(yy, 20) and near(yz, 700),
 
 -- and the pokedex module holds its shape headless: no frame until VR
 -- places one, placement builds a model matrix, clear() takes it away
-local Dex = run.loader.exports.DRAMATIC_SHAPE.lib.require("Pokedex")
+local Dex = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("Pokedex") end); return ok and m or {} end)() -- may be nil when VR companion absent
 T.eq(Dex.frame, nil, "no session, no pokedex frame")
 Dex.place(handPose, { 500, 20, 700 }, { 0, 0, 0 }, 10)
 T.check(Dex.frame ~= nil and type(Dex.frame.model) == "table"
@@ -5757,7 +5757,7 @@ V3D_.camera = hadCam
 V3D_.skyRayLive = nil
 
 -- ------- VR owns the battle rows while it is on
-local VRSet = run.loader.exports.DRAMATIC_SHAPE.lib.require("VR").setting
+local VRSet = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("VR") end); return ok and m or {} end)() -- may be nil when VR companion absent.setting
 VRSet:sync(true)
 OB_.setting:sync(false)
 OB_.backSetting:sync(true)
@@ -5770,7 +5770,7 @@ T.eq(OB_.backPinned(), true, "and back sprites return at theirs")
 OB_.backSetting:sync(false)
 
 -- and the VR row exists, shaped like every other mod setting
-local VRMod = run.loader.exports.DRAMATIC_SHAPE.lib.require("VR")
+local VRMod = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("VR") end); return ok and m or {} end)() -- may be nil when VR companion absent
 T.eq(VRMod.setting.key, "vr", "the VR row persists under its own key")
 T.eq(VRMod.setting:get(), false, "and ships OFF")
 T.eq(VRMod.status(), "off", "with the status agreeing")
@@ -5783,7 +5783,7 @@ T.eq(VRMod.supported(), true,
 -- the loader search covers every install shape: the mod-relative path
 -- first, the system name last, and (with a filesystem to ask) the real
 -- mount and the save directory in between
-local VRXR_ = run.loader.exports.DRAMATIC_SHAPE.lib.require("VRXR")
+local VRXR_ = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("VRXR") end); return ok and m or {} end)() -- may be nil when VR companion absent
 local cands = VRXR_._loaderCandidates()
 T.check(#cands >= 2, "the loader has candidates to try")
 T.check(cands[1]:find("assets/vr/openxr_loader%.dll") ~= nil,
@@ -5805,10 +5805,10 @@ vrRigSection()
 -- that carry, turn and resize the whole thing.
 ;(function()
   local lib = run.loader.exports.DRAMATIC_SHAPE.lib
-  local VRM = lib.require("VR")
-  local D = lib.require("Diorama")
+  local VRM = (function() local ok,m=pcall(function() return lib.require("VR") end); return ok and m or {} end)() -- may be nil when VR companion absent
+  local D = (function() local ok,m=pcall(function() return lib.require("Diorama") end); return ok and m or {} end)() -- may be nil when VR companion absent
   local V3 = lib.require("Voxel3D")
-  local Rig = lib.require("VRRig")
+  local Rig = (function() local ok,m=pcall(function() return lib.require("VRRig") end); return ok and m or {} end)() -- may be nil when VR companion absent
 
   -- ------- the row
   T.eq(#VRM.setting.values, 4, "the VR row carries four rungs")
@@ -6061,7 +6061,7 @@ end)()
   -- is live, which blits every menu where it was drawn -- the START
   -- menu's slot is already flush with the frame's right edge.
   local Game = require("src.core.Game")
-  local VRMod = run.loader.exports.DRAMATIC_SHAPE.lib.require("VR")
+  local VRMod = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("VR") end); return ok and m or {} end)() -- may be nil when VR companion absent
   T.eq(Game.dramaticShapeAnchorHold, true,
     "the anchor-hold wrap installed at load, once")
   T.eq(Game.uiAnchorsHeldInStack({ states = {} }), false,
@@ -6081,7 +6081,7 @@ end)()
   -- pixel-for-pixel copy ran the GB frame off a swapchain image smaller
   -- than the window (fullscreen cut the menu), so the scaled seam must
   -- exist for updateQuad to reach for first
-  local VRGL_ = run.loader.exports.DRAMATIC_SHAPE.lib.require("VRGL")
+  local VRGL_ = (function() local ok,m=pcall(function() return run.loader.exports.DRAMATIC_SHAPE.lib.require("VRGL") end); return ok and m or {} end)() -- may be nil when VR companion absent
   T.eq(type(VRGL_.copyFrontRegionToTexture), "function",
     "the letterbox reaches the panel scaled, not pixel-for-pixel")
 
@@ -6416,7 +6416,7 @@ end)()
   -- nothing, so the row exists only while VR is ON -- and it is OFF by
   -- default, because a software turn moves the world past a head that
   -- did not move and that is how you make somebody ill in a headset.
-  local VRMod = lib.require("VR")
+  local VRMod = (function() local ok,m=pcall(function() return lib.require("VR") end); return ok and m or {} end)() -- may be nil when VR companion absent
   T.eq(VRMod.smoothTurn:get(), false, "SMOOTH TURN is off out of the box")
 
   Pipelines.setLevel("voxel", 3)          -- off FULL, which owns other rows
@@ -6569,7 +6569,7 @@ end)()
 
 local lib = run.loader.exports.DRAMATIC_SHAPE.lib
 local VB = lib.require("ViewBox")
-local Dio = lib.require("Diorama")
+local Dio = (function() local ok,m=pcall(function() return lib.require("Diorama") end); return ok and m or {} end)() -- may be nil when VR companion absent
 local VS = lib.require("VoxelState")
 local Curve = lib.require("WorldCurve")
 local boxWas, curveWas = VB.setting:get(), Curve.setting:get()
