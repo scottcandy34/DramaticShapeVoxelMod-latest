@@ -1,0 +1,56 @@
+# Dramatic Shape — release package ignore list
+# Used by tools/pack_release.py when building the player .zip.
+# One pattern per line. Comments start with #.
+# Patterns are matched against paths relative to the mod root (posix /).
+#
+#   exact/path          — exact file or directory prefix
+#   path/               — directory and everything under it
+#   *.ext               — any file ending with that suffix
+#   **/name             — any path segment equal to name (file or dir)
+#
+# Safety: the packager ALSO always strips ROMs, native binaries, and
+# common junk even if not listed here.
+
+# ------- VCS / editor
+.git/
+.github/
+.gitignore
+.modkitignore
+.packageignore
+
+# ------- Player / private data (never ship)
+baseroms/
+*.z64
+*.n64
+*.v64
+
+# ------- Offline Stadium oracle (keep in git; omit from player zip)
+model_extract/
+
+# ------- Authoring / tests / packager
+tests/
+tools/
+cache/
+build/
+dist/
+tmp/
+__pycache__/
+*.pyc
+*.pyo
+
+# ------- Authoring under assets/docs (carving scripts, not runtime)
+assets/docs/buidling_to_voxel/
+
+# ------- Native / packages (safety)
+*.dll
+*.so
+*.dylib
+*.exe
+*.pdb
+*.zip
+*.love
+
+# ------- OS noise
+**/Zone.Identifier
+.DS_Store
+Thumbs.db

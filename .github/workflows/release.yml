@@ -1,13 +1,12 @@
 name: Release
 
 # Packs the mod into an installable .zip and publishes it as a GitHub Release,
-# once per push to main.
+# once per push to dev (or workflow_dispatch).
 #
-# Archive layout: every mod file at the archive root, manifest.json included.
-# That is one of the two shapes the game accepts on MODS > Import mod .zip
-# (src/mods/LauncherMods.lua locateRoot: manifest at the root, or inside a
-# single top-level folder). Nothing else is added, so the archive stays
-# installable by hand too.
+# Archive layout: runtime files at the archive root, manifest.json included
+# (MODS > Import mod .zip). Built by tools/pack_release.py using
+# .packageignore so baseroms/, model_extract/, oxr/, tests/, tools/, and
+# ROMs never ship.
 #
 # Versioning, first rule that applies wins:
 #   1. the "version" input of a manual run,
@@ -137,11 +136,10 @@ jobs:
           rm -rf "$staging" "$out"
           mkdir -p "$staging" "$out"
 
+          # Full tree at this commit (includes .packageignore)
           git archive HEAD | tar -x -C "$staging"
 
-          rm -rf "$staging/.github" "$staging/.gitattributes" \
-                 "$staging/.gitignore" "$staging/.luarc.json"
-
+          # Stamp release version into the staged manifest
           python3 - "$staging/manifest.json" "$VERSION" <<'PY'
           import json, sys
           path, version = sys.argv[1], sys.argv[2]
@@ -153,8 +151,13 @@ jobs:
               fh.write("\n")
           PY
 
+          # Player package via tools/pack_release.py + .packageignore
+          # (drops baseroms/, model_extract/, oxr/, tests/, tools/, ROMs, …)
           zip_path="$out/${MOD_ID}-${VERSION}.zip"
-          (cd "$staging" && zip -qr "$zip_path" .)
+          python3 "$GITHUB_WORKSPACE/tools/pack_release.py" \
+            --root "$staging" \
+            --output "$zip_path"
+
           unzip -l "$zip_path"
 
           unzip -p "$zip_path" manifest.json > "$RUNNER_TEMP/packed-manifest.json"
