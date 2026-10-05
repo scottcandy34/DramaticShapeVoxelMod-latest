@@ -486,7 +486,7 @@ function Horde.finish(G)
     G.save.options.tilt = snap.tilt or 0
     G.save.options.gbcfx = snap.gbcfx or 0
     require("src.render.Tilt").setLevel(snap.tilt or 0)
-    require("src.render.GBCFX").setLevel(snap.gbcfx or 0)
+    pcall(function() require("src.render.GBCFX").setLevel(snap.gbcfx or 0) end)
     G:writeOptions()
   end)
 
