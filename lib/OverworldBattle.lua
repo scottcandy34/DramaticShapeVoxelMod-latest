@@ -1609,19 +1609,21 @@ function OverworldBattle.snapHUDs(battle, shot)
   local slide = (battle.introSlide or 0) * 4
   local rects, bandX = OverworldBattle.snapRects(shot)
   local enemy, player = OverworldBattle.hudLive(battle, slide)
-  local live = {}
-  if not isIOS() then
-    if enemy then live.enemy = rects.enemy end
-    if player then live.player = rects.player end
+  -- iOS composites this canvas upside down, which is why the bands below are
+  -- drawn flipped there. A panel bound for a screen row goes in at the mirrored
+  -- one for the same reason, or it lands behind the Pokemon instead of under
+  -- its glyphs. The frost is cut from that same canvas rect, so it needs no
+  -- flip of its own.
+  local ios = isIOS()
+  local function place(rect)
+    if not ios then return rect end
+    return { rect[1], shot.ph - rect[2] - rect[4], rect[3], rect[4] }
   end
-  -- The text box's frost panel normally goes into this same world-canvas pass.
-  -- On iOS that panel is mirrored upward by the Canvas-to-Canvas path, creating
-  -- the large ghost rectangle behind the Pokemon. Keep the box border/text but
-  -- skip only this frosted backing on iOS.
-  if not isIOS() then
-    for key, rect in pairs(OverworldBattle.textRects(battle)) do
-      live[key] = toWorld(rect, shot)
-    end
+  local live = {}
+  if enemy then live.enemy = place(rects.enemy) end
+  if player then live.player = place(rects.player) end
+  for key, rect in pairs(OverworldBattle.textRects(battle)) do
+    live[key] = place(toWorld(rect, shot))
   end
   local layer = OverworldBattle.hudTexture(battle, slide)
   if not layer then return false end
