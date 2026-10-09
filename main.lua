@@ -777,6 +777,13 @@ local HOTKEYS = {
   ["9"] = Water.setting,
 }
 
+-- GBC FX left the engine in 0.2.21, so on a current engine there is no level
+-- here to set, and a bare require of it ends the session.
+local function setGbcFx(level)
+  local ok, GBCFX = pcall(require, "src.render.GBCFX")
+  if ok and GBCFX and GBCFX.setLevel then pcall(GBCFX.setLevel, level) end
+end
+
 -- One step of the VOXEL angle ladder: everything a "3" press does, named
 -- so the pad's SELECT button (below) can make exactly the same step. The
 -- gate is the registry's own; the tilt/GBC FX clearing is the engine work
@@ -799,7 +806,7 @@ local function cycleVoxel(game)
   -- clears them on EVERY press, not just the press that switches on.
   game.save.options.tilt = 0
   game.save.options.gbcfx = 0
-  require("src.render.GBCFX").setLevel(0)
+  setGbcFx(0)
   require("src.render.Tilt").setLevel(game.save.options.tilt or 0)
   game:writeOptions()
   V.log:event("voxel", "cycle", { level = nextLevel })
@@ -818,7 +825,7 @@ local function setVoxelLevel(game, level)
   Pipelines.syncOptions(game.save.options)
   game.save.options.tilt = 0
   game.save.options.gbcfx = 0
-  require("src.render.GBCFX").setLevel(0)
+  setGbcFx(0)
   require("src.render.Tilt").setLevel(game.save.options.tilt or 0)
   game:writeOptions()
   return true
@@ -975,7 +982,6 @@ local function pinEngineFx(game)
   game = game or require("src.core.Game")
   local opts = game and game.save and game.save.options
   local Tilt = require("src.render.Tilt")
-  local GBCFX = require("src.render.GBCFX")
   local changed = false
   if opts then
     changed = (opts.tilt or 0) ~= 0 or (opts.gbcfx or 0) ~= 0
@@ -984,7 +990,7 @@ local function pinEngineFx(game)
     opts.battleBg = "white"
   end
   pcall(Tilt.setLevel, 0)
-  pcall(GBCFX.setLevel, 0)
+  setGbcFx(0)
   if changed and game.writeOptions then pcall(game.writeOptions, game) end
 end
 
