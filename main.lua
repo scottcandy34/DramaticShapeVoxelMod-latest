@@ -349,6 +349,20 @@ mod.content.render_pipelines:register("voxel", {
     -- them announces it. Ahead of the active() gate, so switching it
     -- while voxel mode is OFF still invalidates what is cached.
     voidFill.check()
+    -- The whole VR frame rides this hook when the companion is installed.
+    -- This is the tick that runs through menus, dialogs and battles, which
+    -- is what a headset needs, and it is ahead of the active() gate so the
+    -- mode being off still leaves the flat screen on the floating panel.
+    -- 1.8.5 called VR.update here; the companion owns that function now.
+    -- VoxelVR skips its own Game:update wrap when drivesVR is set, so the
+    -- frame is submitted once.
+    if _vrCompanion and _vrCompanion.update then
+      local okVR, errVR = pcall(_vrCompanion.update, dt)
+      if not okVR and not V._vrUpdateWarned then
+        V._vrUpdateWarned = true
+        V.dlog(("VR companion update failed: %s"):format(tostring(errVR)))
+      end
+    end
     -- Android prepares large BODY meshes once on an opaque, resumable screen.
     -- Completion lives in persistent storage, so subsequent launches and
     -- ordinary traversal only stream bounded cache chunks. Keep this after
@@ -1587,7 +1601,7 @@ mod.hooks:wrap("world.tod", function(next, tod, ctx)
   return DayNight.tod()
 end)
 
-mod.exports.version = "1.9.0"
+mod.exports.version = "1.9.3"
 -- exposed so a companion mod can pin its own tiles' shapes or read the
 -- camera without reaching into this mod's file layout
 mod.exports.lib = V
@@ -1595,6 +1609,9 @@ mod.exports.lib = V
 -- VR.setVoxelLevel when VR lived in this package).
 mod.exports.cycleVoxel = cycleVoxel
 mod.exports.setVoxelLevel = setVoxelLevel
+-- VoxelVR 1.1.0+ leaves Game:update alone when this is set and waits
+-- for the pipeline call above. Older companions ignore it and wrap.
+mod.exports.drivesVR = true
 -- Optional VR companion registration (VOXEL_VR calls this).
 function mod.exports.registerVR(exports)
   _vrCompanion = exports
