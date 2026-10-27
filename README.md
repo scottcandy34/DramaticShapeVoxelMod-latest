@@ -17,11 +17,13 @@ loads LuaJIT FFI or an OpenXR loader (sandbox-safe / Android-friendly).
 
 ### Install both
 
-1. Install this mod (**DRAMATIC_SHAPE** 1.9.0+).
-2. Import [VoxelVR 1.0.0](https://github.com/scottcandy34/VoxelVR) the same
+1. Install this mod (**DRAMATIC_SHAPE** 1.9.3+).
+2. Import [VoxelVR 1.1.0](https://github.com/scottcandy34/VoxelVR) the same
    way: **MODS → Import mod .zip**.
-3. Enable both. On Windows with an OpenXR runtime (SteamVR, Oculus, WMR, …)
-   a **VR** row appears on the OPTIONS menu.
+3. Enable both. On Windows with an OpenXR runtime (SteamVR, Horizon Link,
+   WMR, …) a **VR** row appears on the OPTIONS menu. This mod calls the
+   companion from the voxel tick; VoxelVR 1.1.0 runs the OpenXR session
+   off the sandboxed game thread.
 
 ### Requirements for VR
 

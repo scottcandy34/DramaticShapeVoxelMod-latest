@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.3 — 2026-10-27
+
+### Fixed
+- **VoxelVR had no per-frame tick from this mod.** 1.8.5 called
+  `VR.update` from the voxel pipeline, ahead of the active() gate, so a
+  headset kept presenting through menus and battles. The 1.9.0 split left
+  the mirror hook but dropped that call. The pipeline now calls the
+  companion's `exports.update` in the same place.
+- Export `drivesVR` so VoxelVR 1.1.0+ does not also wrap `Game:update`
+  (two submits per tick). An older VoxelVR ignores the flag and keeps its
+  own wrap.
+
 ## 1.9.0 — 2026-08-21
 
 ### Added
